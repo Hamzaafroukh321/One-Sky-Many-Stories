@@ -1,0 +1,178 @@
+{
+  "id": "greek",
+  "label": "Greek",
+  "region": "Europe",
+  "accent": "#E8D9A0",
+  "line": "#C9B66E",
+  "license": "Creative Commons; see Stellarium western sky culture license",
+  "source": "Stellarium Sky Cultures / Western sky culture",
+  "constellations": [
+    {
+      "id": "CON western Ori",
+      "name": "Hunter",
+      "nativeName": "Orion",
+      "romanization": "",
+      "lines": [
+        [
+          26727,
+          26311,
+          25930
+        ],
+        [
+          28691,
+          29426,
+          29038,
+          27913
+        ],
+        [
+          29426,
+          28614,
+          27989,
+          26727,
+          27366,
+          24436,
+          25930,
+          25336,
+          26207,
+          27989
+        ],
+        [
+          25336,
+          22449,
+          22549,
+          22730,
+          23123
+        ],
+        [
+          22449,
+          22509,
+          22845
+        ],
+        [
+          29038,
+          28614
+        ]
+      ],
+      "myth": "Orion is the great hunter, a huge human figure drawn around the bright belt stars. In Greek tradition his pride and violence lead to his death, and the hunter is set in the sky with the scorpion that can still chase him below the horizon."
+    },
+    {
+      "id": "CON western UMa",
+      "name": "Great Bear",
+      "nativeName": "Ursa Major",
+      "romanization": "",
+      "lines": [
+        [
+          67301,
+          65378,
+          62956,
+          59774,
+          54061,
+          53910,
+          58001,
+          59774
+        ],
+        [
+          58001,
+          57399,
+          54539,
+          50372
+        ],
+        [
+          54539,
+          50801
+        ],
+        [
+          53910,
+          48402,
+          46853,
+          44471
+        ],
+        [
+          46853,
+          44127
+        ],
+        [
+          48402,
+          48319,
+          41704,
+          46733,
+          54061
+        ]
+      ],
+      "myth": "Ursa Major is the Great Bear. Greek tellings often connect it with Callisto, transformed into a bear and then lifted among the stars, where the bear circles the northern sky without setting for many northern observers."
+    },
+    {
+      "id": "CON western Sco",
+      "name": "Scorpion",
+      "nativeName": "Scorpius",
+      "romanization": "",
+      "lines": [
+        [
+          85927,
+          86670,
+          87073,
+          86228,
+          84143,
+          82671,
+          82514,
+          82396,
+          81266,
+          80763,
+          78401
+        ],
+        [
+          80763,
+          78265
+        ],
+        [
+          80763,
+          78820
+        ]
+      ],
+      "myth": "Scorpius is the scorpion sent against Orion. Its curved body and red Antares make the figure feel alive, and its rising as Orion leaves the sky turns the myth into a seasonal chase."
+    },
+    {
+      "id": "CON western Cyg",
+      "name": "Swan",
+      "nativeName": "Cygnus",
+      "romanization": "",
+      "lines": [
+        [
+          94779,
+          95853,
+          97165,
+          100453,
+          102098
+        ],
+        [
+          100453,
+          102488,
+          104732,
+          107310
+        ],
+        [
+          100453,
+          98110,
+          95947
+        ]
+      ],
+      "myth": "Cygnus is the Swan, stretched along the Milky Way. Classical stories attach the bird to divine disguise, grief, and transformation, making the bright cross of stars a figure of passage between worlds."
+    },
+    {
+      "id": "CON western Cas",
+      "name": "Seated Queen",
+      "nativeName": "Cassiopeia",
+      "romanization": "",
+      "lines": [
+        [
+          8886,
+          6686,
+          4427,
+          3179,
+          746
+        ]
+      ],
+      "myth": "Cassiopeia is the seated queen whose boast about beauty brought danger to her kingdom. The compact W-shaped figure keeps her visible near the north celestial pole, turning vanity into a permanent warning."
+    }
+  ]
+}

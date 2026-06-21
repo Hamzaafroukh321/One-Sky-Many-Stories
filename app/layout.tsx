@@ -27,6 +27,9 @@ export const metadata: Metadata = {
   title: "One Sky, Many Stories",
   description:
     "A single field of real stars where different sky cultures redraw the same constellations into different stories.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

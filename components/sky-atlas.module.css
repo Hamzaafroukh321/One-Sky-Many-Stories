@@ -15,6 +15,12 @@
   display: block;
   width: 100%;
   height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+.sky:active {
+  cursor: grabbing;
 }
 
 .topBar {
@@ -90,6 +96,7 @@
   top: 18vh;
   max-width: 460px;
   pointer-events: none;
+  transition: opacity 240ms ease;
 }
 
 .intro p,
@@ -120,6 +127,153 @@
   margin-top: 18px;
   background: var(--accent);
   content: "";
+}
+
+.compareLegend {
+  position: absolute;
+  z-index: 2;
+  left: clamp(24px, 6vw, 86px);
+  bottom: calc(var(--rail-height) + 18px);
+  display: flex;
+  gap: 14px;
+  padding: 9px 0;
+  color: var(--mute);
+  font-family: var(--font-space-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.compareLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.compareLegend span::before {
+  display: block;
+  width: 20px;
+  height: 1px;
+  background: currentColor;
+  content: "";
+}
+
+.compareLegend span:last-child {
+  color: var(--accent);
+}
+
+.storyPanel,
+.sourcesPanel {
+  position: absolute;
+  z-index: 3;
+  top: 58px;
+  right: 0;
+  bottom: var(--rail-height);
+  width: min(430px, calc(100vw - 32px));
+  padding: 34px 34px 30px;
+  overflow-y: auto;
+  border-left: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--ink) 92%, transparent);
+  backdrop-filter: blur(12px);
+  transform: translateX(102%);
+  transition: transform 320ms ease-out;
+}
+
+.storyPanel[data-open="true"],
+.sourcesPanel {
+  transform: translateX(0);
+}
+
+.closeButton {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 30px;
+  height: 30px;
+  border: 1px solid color-mix(in srgb, var(--haze) 72%, transparent);
+  background: transparent;
+  color: var(--mute);
+  cursor: pointer;
+  font-family: var(--font-space-mono), monospace;
+  font-size: 13px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.closeButton:hover {
+  color: var(--starlight);
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.eyebrow,
+.sourceBlock {
+  font-family: var(--font-space-mono), monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  margin: 0 34px 12px 0;
+  color: var(--mute);
+}
+
+.storyPanel h2,
+.sourcesPanel h2 {
+  margin: 0;
+  color: var(--starlight);
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: clamp(38px, 4.8vw, 58px);
+  font-variation-settings: "opsz" 144, "wght" 560;
+  font-weight: 560;
+  line-height: 0.98;
+}
+
+.nativeName {
+  min-height: 22px;
+  margin: 12px 0 0;
+  color: var(--mute);
+  font-family: var(--font-space-mono), monospace;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+.rule {
+  width: 100%;
+  height: 1px;
+  margin: 24px 0;
+  background: var(--accent);
+}
+
+.myth,
+.emptyState,
+.sourcesPanel p {
+  max-width: 62ch;
+  color: color-mix(in srgb, var(--starlight) 88%, var(--mute));
+  font-family: var(--font-spectral), Georgia, serif;
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.emptyState {
+  margin-top: 54px;
+  color: var(--mute);
+}
+
+.sourceBlock {
+  display: grid;
+  gap: 8px;
+  margin-top: 30px;
+  padding-top: 18px;
+  border-top: 1px solid color-mix(in srgb, var(--haze) 80%, transparent);
+  color: var(--mute);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.sourceBlock strong {
+  color: var(--accent);
+  font-weight: 400;
 }
 
 .rail {
@@ -209,10 +363,42 @@
   .cultureChip {
     min-width: 148px;
   }
+
+  .compareLegend {
+    left: 20px;
+    right: 20px;
+    bottom: 132px;
+    flex-wrap: wrap;
+  }
+
+  .storyPanel,
+  .sourcesPanel {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    max-height: 70vh;
+    padding: 32px 22px 150px;
+    border-top: 1px solid var(--accent);
+    border-left: 0;
+    transform: translateY(102%);
+  }
+
+  .storyPanel[data-open="true"],
+  .sourcesPanel {
+    transform: translateY(0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .shell {
+    transition: none;
+  }
+
+  .storyPanel,
+  .sourcesPanel,
+  .intro {
     transition: none;
   }
 }

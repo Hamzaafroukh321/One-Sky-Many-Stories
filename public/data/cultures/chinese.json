@@ -1,0 +1,137 @@
+{
+  "id": "chinese",
+  "label": "Chinese",
+  "region": "East Asia",
+  "accent": "#E4434B",
+  "line": "#D98C2B",
+  "license": "Creative Commons; see Stellarium Chinese sky culture license",
+  "source": "Stellarium Sky Cultures / Chinese sky culture",
+  "constellations": [
+    {
+      "id": "CON chinese 003",
+      "name": "Three Stars",
+      "nativeName": "参宿",
+      "romanization": "Shēnxiù",
+      "lines": [
+        [
+          27989,
+          26727,
+          26311,
+          25930,
+          24436
+        ],
+        [
+          25930,
+          25336
+        ],
+        [
+          26727,
+          27366
+        ]
+      ],
+      "myth": "Three Stars, or Shenxiu, uses the bright stars western viewers know as Orion's Belt and sword. In the Chinese sky it is one of the lunar mansions and belongs to a wider courtly and seasonal map rather than a lone hunter."
+    },
+    {
+      "id": "CON chinese 039",
+      "name": "Northern Dipper",
+      "nativeName": "北斗",
+      "romanization": "Běidǒu",
+      "lines": [
+        [
+          54061,
+          53910,
+          58001,
+          59774,
+          62956,
+          65378,
+          67301
+        ]
+      ],
+      "myth": "The Northern Dipper, Beidou, is a celestial ladle and regulator of time. Its turning around the pole marked seasons, directions, and imperial order in traditional Chinese astronomy."
+    },
+    {
+      "id": "CON chinese 026",
+      "name": "Heart",
+      "nativeName": "心宿",
+      "romanization": "Xīnxiù",
+      "lines": [
+        [
+          80112,
+          80763,
+          81266
+        ]
+      ],
+      "myth": "Heart, Xinxiu, centers on the red star Antares and forms the heart of the Azure Dragon. The star was watched as a seasonal fire, a sign of summer heat and agricultural timing."
+    },
+    {
+      "id": "CON chinese 024",
+      "name": "Tail",
+      "nativeName": "尾宿",
+      "romanization": "Wěixiù",
+      "lines": [
+        [
+          82396,
+          82514,
+          82671,
+          84143,
+          86228,
+          87073,
+          86670,
+          85927,
+          85696
+        ],
+        [
+          82514,
+          82545
+        ]
+      ],
+      "myth": "Tail, Weixiu, is another mansion of the Azure Dragon. The same stars that other traditions may divide into a scorpion become part of a long eastern dragon crossing the sky."
+    },
+    {
+      "id": "CON chinese 029",
+      "name": "Wings",
+      "nativeName": "翼宿",
+      "romanization": "Yìxiù",
+      "lines": [
+        [
+          53740,
+          55705
+        ],
+        [
+          53740,
+          55598
+        ],
+        [
+          53740,
+          52943
+        ],
+        [
+          55705,
+          57283,
+          55598
+        ],
+        [
+          57283,
+          58188
+        ],
+        [
+          55705,
+          55282,
+          56802,
+          55874,
+          55687
+        ],
+        [
+          55687,
+          56633
+        ],
+        [
+          55598,
+          54682,
+          54204
+        ]
+      ],
+      "myth": "Wings, Yixiu, belongs to the southern bird pattern. Its figure shows how Chinese astronomy often organized stars into officials, walls, beasts, and mansions rather than isolated mythic characters."
+    }
+  ]
+}

@@ -9,6 +9,7 @@ out/
 dist/
 build/
 coverage/
+tsconfig.tsbuildinfo
 
 # Logs
 *.log
@@ -16,6 +17,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+dev-server.*.log
+.playwright-cli/
+output/playwright/
 
 # Environment
 .env

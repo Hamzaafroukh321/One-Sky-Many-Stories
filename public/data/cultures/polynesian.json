@@ -1,0 +1,130 @@
+{
+  "id": "polynesian",
+  "label": "Polynesian",
+  "region": "Pacific",
+  "accent": "#34C7C2",
+  "line": "#F0876A",
+  "license": "Creative Commons; see Stellarium Hawaiian starlines sky culture license",
+  "source": "Stellarium Sky Cultures / Hawaiian Starlines",
+  "constellations": [
+    {
+      "id": "CON hawaiian_starlines MAN",
+      "name": "The Chief's Fishline",
+      "nativeName": "Manaiakalani",
+      "romanization": "",
+      "lines": [
+        [
+          85927,
+          86670,
+          87073,
+          86228,
+          84143,
+          82671,
+          82514,
+          82396,
+          81266,
+          80763,
+          80112,
+          78401
+        ],
+        [
+          78820,
+          78401,
+          78265
+        ]
+      ],
+      "myth": "Manaiakalani, the Chief's Fishline, connects bright stars into the great fishhook associated with Maui. It is a navigational and story-bearing line, turning the sky into a tool for voyaging."
+    },
+    {
+      "id": "CON hawaiian_starlines IWI",
+      "name": "The Backbone",
+      "nativeName": "Ka Iwikuamo’o",
+      "romanization": "",
+      "lines": [
+        [
+          11767,
+          54061
+        ],
+        [
+          67301,
+          69673,
+          65474
+        ],
+        [
+          60965,
+          65474
+        ],
+        [
+          60221,
+          61084
+        ]
+      ],
+      "myth": "Ka Iwikuamoo, the Backbone, is a long guiding structure across the sky. Hawaiian starlines emphasize orientation, genealogy, and ocean travel as much as pictured figures."
+    },
+    {
+      "id": "CON hawaiian_starlines NAH",
+      "name": "The Seven",
+      "nativeName": "Na Hiku",
+      "romanization": "",
+      "lines": [
+        [
+          67301,
+          65378,
+          62956,
+          59774,
+          54061,
+          53910,
+          58001,
+          59774
+        ]
+      ],
+      "myth": "Na Hiku, the Seven, gathers the familiar seven bright stars of the northern dipper pattern. In this sky culture the group participates in navigation and naming rather than becoming a bear."
+    },
+    {
+      "id": "CON hawaiian_starlines KHK",
+      "name": "The Cat's Cradle",
+      "nativeName": "Ka Hei-Hei o Na Keiki",
+      "romanization": "",
+      "lines": [
+        [
+          27989,
+          26727,
+          27366,
+          24436,
+          25930,
+          25336,
+          27989
+        ],
+        [
+          26727,
+          26311,
+          25930
+        ]
+      ],
+      "myth": "Ka Hei-Hei o Na Keiki, the Cat's Cradle, uses the Orion stars as a woven game-like figure. The same anchors that form a Greek hunter become a pattern of play and line-work."
+    },
+    {
+      "id": "CON hawaiian_starlines NAV",
+      "name": "Navigator's Triangle",
+      "nativeName": "",
+      "romanization": "",
+      "lines": [
+        [
+          102098,
+          97649,
+          91262,
+          102098
+        ],
+        [
+          95947,
+          97165,
+          100453,
+          102488,
+          102098,
+          100453
+        ]
+      ],
+      "myth": "Navigator's Triangle is a practical oceanic figure. It draws a compact triangle from bright stars and treats the sky as a living compass for movement across the Pacific."
+    }
+  ]
+}

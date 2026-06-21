@@ -399,6 +399,7 @@ export function SkyAtlas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewRef = useRef<ViewState>(defaultView);
   const dragRef = useRef<{ x: number; y: number; view: ViewState } | null>(null);
+  const pointerRef = useRef({ x: 0, y: 0, active: false });
   const transitionRef = useRef<{ from: string; to: string; startedAt: number; sharedHips: number[] } | null>(null);
   const ignitionStartedAtRef = useRef<number | null>(null);
   const illustrationCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
@@ -434,6 +435,21 @@ export function SkyAtlas() {
         (constellation) => constellation.id === selectedConstellationId,
       ) ?? null,
     [activeCulture, selectedConstellationId],
+  );
+  const hoveredConstellation = useMemo(
+    () =>
+      activeCulture?.constellations.find(
+        (constellation) => constellation.id === hoveredConstellationId,
+      ) ?? null,
+    [activeCulture, hoveredConstellationId],
+  );
+  const selectedHips = useMemo(
+    () => (selectedConstellation ? constellationHipSet(selectedConstellation) : new Set<number>()),
+    [selectedConstellation],
+  );
+  const hoveredHips = useMemo(
+    () => (hoveredConstellation ? constellationHipSet(hoveredConstellation) : new Set<number>()),
+    [hoveredConstellation],
   );
   const starsByHip = useMemo(() => new Map(stars.map((star) => [star.hip, star])), [stars]);
   const overlapInsights = useMemo(() => {
@@ -623,6 +639,7 @@ export function SkyAtlas() {
       options: { alpha: number; progress: number; ghost?: boolean },
     ) => {
       const lineColor = options.ghost ? "#8A91A6" : culture.line;
+      const hasFocus = Boolean(selectedConstellationId || hoveredConstellationId);
       context.save();
       context.lineCap = "round";
       context.lineJoin = "round";
@@ -630,8 +647,10 @@ export function SkyAtlas() {
 
       for (const constellation of culture.constellations) {
         const hovered = constellation.id === hoveredConstellationId;
-        const dimmed = hoveredConstellationId && !hovered && !options.ghost;
-        const strokeAlpha = options.alpha * (dimmed ? 0.16 : hovered ? 1 : options.ghost ? 0.56 : 0.72);
+        const selected = constellation.id === selectedConstellationId;
+        const awake = hovered || selected;
+        const dimmed = hasFocus && !awake && !options.ghost;
+        const strokeAlpha = options.alpha * (dimmed ? 0.12 : selected ? 1 : hovered ? 1 : options.ghost ? 0.56 : 0.72);
         const projectedLines = constellation.lines.map((line) =>
           line
             .map((hip) => starsByHip.get(hip))
@@ -639,13 +658,13 @@ export function SkyAtlas() {
             .map((star) => projectCurrent(star)),
         );
 
-        if (hovered && !options.ghost) {
+        if (awake && !options.ghost) {
           context.save();
           context.setLineDash([]);
           context.shadowColor = rgba(culture.accent, 0.92);
-          context.shadowBlur = 22;
-          context.strokeStyle = rgba(culture.accent, 0.28);
-          context.lineWidth = 8;
+          context.shadowBlur = selected ? 30 : 22;
+          context.strokeStyle = rgba(culture.accent, selected ? 0.34 : 0.28);
+          context.lineWidth = selected ? 11 : 8;
           for (const points of projectedLines) {
             drawProgressPath(context, points, options.progress);
           }
@@ -653,15 +672,15 @@ export function SkyAtlas() {
         }
 
         context.strokeStyle = rgba(lineColor, strokeAlpha);
-        context.lineWidth = options.ghost ? 1.1 : hovered ? 3.2 : 1.6;
-        context.shadowColor = rgba(lineColor, options.ghost ? 0.12 : hovered ? 0.5 : 0.24);
-        context.shadowBlur = options.ghost ? 0 : hovered ? 9 : 5;
+        context.lineWidth = options.ghost ? 1.1 : selected ? 3.8 : hovered ? 3.2 : 1.6;
+        context.shadowColor = rgba(lineColor, options.ghost ? 0.12 : awake ? 0.58 : 0.24);
+        context.shadowBlur = options.ghost ? 0 : awake ? 11 : 5;
 
         for (const points of projectedLines) {
           drawProgressPath(context, points, options.progress);
         }
 
-        if (hovered && !options.ghost) {
+        if (awake && !options.ghost) {
           const highlightedHips = new Set(constellation.lines.flatMap((line) => line));
           for (const hip of highlightedHips) {
             const star = starsByHip.get(hip);
@@ -675,15 +694,16 @@ export function SkyAtlas() {
             }
 
             const pulse = reducedMotion ? 1 : 0.78 + Math.sin(performance.now() * 0.004 + star.phase) * 0.22;
+            const radius = selected ? 10.5 : 7.5;
             context.save();
             context.strokeStyle = rgba(culture.accent, 0.48 * pulse);
             context.lineWidth = 1;
             context.beginPath();
-            context.arc(point.x, point.y, 7.5 + pulse * 2.5, 0, Math.PI * 2);
+            context.arc(point.x, point.y, radius + pulse * 3, 0, Math.PI * 2);
             context.stroke();
-            context.fillStyle = rgba(culture.accent, 0.24);
+            context.fillStyle = rgba(culture.accent, selected ? 0.34 : 0.24);
             context.beginPath();
-            context.arc(point.x, point.y, 2.4, 0, Math.PI * 2);
+            context.arc(point.x, point.y, selected ? 3 : 2.4, 0, Math.PI * 2);
             context.fill();
             context.restore();
           }
@@ -786,9 +806,13 @@ export function SkyAtlas() {
       context.beginPath();
       context.ellipse(targetCenter.x, targetCenter.y, clipRadius * 1.05, clipRadius * 0.9, 0, 0, Math.PI * 2);
       context.clip();
-      context.globalAlpha = reducedMotion ? 0.2 : 0.18 + Math.sin(performance.now() * 0.002) * 0.018;
+      const selected = constellation.id === selectedConstellationId;
+      const hoverLift = selected ? 0.08 : constellation.id === hoveredConstellationId ? 0.04 : 0;
+      context.globalAlpha = reducedMotion ? 0.24 + hoverLift : 0.2 + hoverLift + Math.sin(performance.now() * 0.002) * 0.02;
       context.globalCompositeOperation = "screen";
-      context.filter = `grayscale(1) contrast(1.5) brightness(1.24) sepia(0.22) drop-shadow(0 0 8px ${culture.line})`;
+      context.filter = `grayscale(1) contrast(1.62) brightness(${selected ? 1.38 : 1.28}) sepia(0.22) drop-shadow(0 0 ${
+        selected ? 14 : 9
+      }px ${culture.line})`;
       context.translate(targetCenter.x, targetCenter.y);
       context.rotate(targetAngle - sourceAngle);
       context.scale(scale, scale);
@@ -882,12 +906,21 @@ export function SkyAtlas() {
       }
 
       projectCurrent = createProjector(viewRef.current, width, height);
+      const pointer = pointerRef.current;
+      const parallaxX = reducedMotion || !pointer.active ? 0 : pointer.x * 10;
+      const parallaxY = reducedMotion || !pointer.active ? 0 : pointer.y * 7;
+      const focusHips = selectedHips.size > 0 ? selectedHips : hoveredHips;
+      const hasStarFocus = focusHips.size > 0;
 
       context.save();
       context.globalCompositeOperation = "lighter";
       for (const star of stars) {
         const point = projectCurrent(star);
-        if (!point.visible || point.x < -24 || point.x > width + 24 || point.y < -24 || point.y > height + 24) {
+        const depth = clamp((6.4 - star.mag) / 5.8, 0.12, 1);
+        const x = point.x + parallaxX * (0.25 + depth * 0.75);
+        const y = point.y + parallaxY * (0.18 + depth * 0.64);
+
+        if (!point.visible || x < -24 || x > width + 24 || y < -24 || y > height + 24) {
           continue;
         }
 
@@ -897,9 +930,12 @@ export function SkyAtlas() {
         const starIgnition = reducedMotion
           ? 1
           : easeOutCubic((ignitionElapsed - distanceFromCenter * 420) / 900);
-        const alpha = baseAlpha * twinkle * skyIgnition * starIgnition;
+        const focused = focusHips.has(star.hip);
+        const sharedPulse = activePulseHips.has(star.hip);
+        const focusMultiplier = focused ? 1.72 : sharedPulse ? 1.42 : hasStarFocus || selectedConstellation ? 0.52 : 1;
+        const alpha = clamp(baseAlpha * twinkle * skyIgnition * starIgnition * focusMultiplier, 0, 1);
 
-        drawStar(context, point.x, point.y, star.mag, star.ci, alpha);
+        drawStar(context, x, y, star.mag, star.ci, alpha);
       }
       context.restore();
 
@@ -961,10 +997,13 @@ export function SkyAtlas() {
     activeCulture,
     activePulseHips,
     cultures,
+    hoveredHips,
     hoveredConstellationId,
     pinnedCulture,
     reducedMotion,
     selectedConstellation,
+    selectedConstellationId,
+    selectedHips,
     skyReady,
     stars,
     starsByHip,
@@ -1037,6 +1076,12 @@ export function SkyAtlas() {
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     setHasExplored(true);
+    const rect = event.currentTarget.getBoundingClientRect();
+    pointerRef.current = {
+      x: ((event.clientX - rect.left) / rect.width - 0.5) * 2,
+      y: ((event.clientY - rect.top) / rect.height - 0.5) * 2,
+      active: true,
+    };
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
       x: event.clientX,
@@ -1046,9 +1091,15 @@ export function SkyAtlas() {
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    pointerRef.current = {
+      x: ((event.clientX - rect.left) / rect.width - 0.5) * 2,
+      y: ((event.clientY - rect.top) / rect.height - 0.5) * 2,
+      active: true,
+    };
+
     if (dragRef.current) {
       const drag = dragRef.current;
-      const rect = event.currentTarget.getBoundingClientRect();
       const effectiveZoom = viewportZoom(drag.view, rect.width, rect.height);
       const next = {
         ...drag.view,
@@ -1059,7 +1110,6 @@ export function SkyAtlas() {
       return;
     }
 
-    const rect = event.currentTarget.getBoundingClientRect();
     const target = findConstellationAt(event.clientX - rect.left, event.clientY - rect.top, activeCulture);
     setHoveredConstellationId(target?.id ?? null);
     setHoverTarget(target);
@@ -1132,6 +1182,7 @@ export function SkyAtlas() {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerLeave={() => {
+          pointerRef.current = { x: 0, y: 0, active: false };
           setHoveredConstellationId(null);
           setHoverTarget(null);
         }}

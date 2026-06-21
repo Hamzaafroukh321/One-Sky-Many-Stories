@@ -117,6 +117,12 @@
   font-family: var(--font-space-mono), monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  transition:
+    color 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
 }
 
 .textButton {
@@ -131,6 +137,7 @@
 .textButton:hover,
 .iconButton:hover {
   color: var(--starlight);
+  transform: translateY(-1px);
 }
 
 .iconButton {
@@ -140,6 +147,14 @@
   height: 32px;
   border: 1px solid color-mix(in srgb, var(--haze) 72%, transparent);
   font-size: 13px;
+}
+
+.iconButton:hover,
+.textButton:hover {
+  border-color: color-mix(in srgb, var(--accent) 64%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent),
+    0 0 22px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .iconButton svg,
@@ -272,25 +287,42 @@
 }
 
 .hoverCard {
-  left: clamp(20px, calc(var(--hover-x) + 86px), calc(100vw - 230px));
-  top: clamp(74px, calc(var(--hover-y) - 96px), calc(100vh - var(--rail-height) - 150px));
-  width: 210px;
-  min-height: 82px;
-  padding: 12px 13px;
+  left: clamp(22px, calc(var(--hover-x) + 104px), calc(100vw - 258px));
+  top: clamp(76px, calc(var(--hover-y) - 108px), calc(100vh - var(--rail-height) - 164px));
+  width: 238px;
+  min-height: 90px;
+  padding: 14px 15px;
   border-left: 1px solid var(--accent);
-  background: color-mix(in srgb, var(--ink) 84%, transparent);
-  backdrop-filter: blur(10px);
+  background:
+    linear-gradient(110deg, color-mix(in srgb, var(--accent) 9%, transparent), transparent 48%),
+    color-mix(in srgb, var(--ink) 78%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent),
+    0 18px 58px rgba(0, 0, 0, 0.34),
+    0 0 30px color-mix(in srgb, var(--accent) 14%, transparent);
+  backdrop-filter: blur(14px);
   pointer-events: none;
-  animation: hoverCardIn 180ms ease-out both;
+  animation: hoverCardIn 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .hoverCard::before {
   position: absolute;
   left: -7px;
-  top: 17px;
+  top: 20px;
   width: 13px;
   height: 1px;
   background: var(--accent);
+  content: "";
+}
+
+.hoverCard::after {
+  position: absolute;
+  left: 15px;
+  right: 15px;
+  bottom: 10px;
+  height: 1px;
+  background: linear-gradient(to right, var(--accent), transparent);
+  opacity: 0.58;
   content: "";
 }
 
@@ -305,7 +337,7 @@
   display: block;
   color: var(--starlight);
   font-family: var(--font-fraunces), Georgia, serif;
-  font-size: 24px;
+  font-size: 27px;
   font-variation-settings: "opsz" 144, "wght" 560;
   font-weight: 560;
   letter-spacing: 0;
@@ -508,6 +540,7 @@
   border-radius: 2px;
   font-size: 12px;
   text-align: left;
+  overflow: hidden;
 }
 
 .cultureChip::after {
@@ -519,6 +552,27 @@
   background: var(--chip-line);
   opacity: 0.56;
   content: "";
+  transition:
+    opacity 180ms ease,
+    transform 220ms ease;
+  transform-origin: left;
+}
+
+.cultureChip::before {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent,
+    color-mix(in srgb, var(--chip-line) 18%, transparent),
+    transparent
+  );
+  opacity: 0;
+  transform: translateX(-60%);
+  transition:
+    opacity 180ms ease,
+    transform 360ms ease;
+  content: "";
 }
 
 .cultureChip:hover,
@@ -526,9 +580,22 @@
   color: var(--starlight);
 }
 
+.cultureChip:hover {
+  border-color: color-mix(in srgb, var(--chip-line) 26%, transparent);
+  background: color-mix(in srgb, var(--chip-line) 8%, transparent);
+  box-shadow: 0 0 28px color-mix(in srgb, var(--chip-line) 11%, transparent);
+  transform: translateY(-2px);
+}
+
+.cultureChip:hover::before {
+  opacity: 1;
+  transform: translateX(42%);
+}
+
 .cultureChip[data-active="true"] {
   border-color: color-mix(in srgb, var(--accent) 28%, transparent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
+  box-shadow: 0 0 32px color-mix(in srgb, var(--accent) 13%, transparent);
 }
 
 .cultureChip[data-active="true"]::after {

@@ -209,12 +209,110 @@
 
 .compareLegend,
 .switchNotice,
-.hoverCard {
+.hoverCard,
+.wonderDock,
+.journeyCaption {
   position: absolute;
   z-index: 2;
   font-family: var(--font-space-mono), monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.wonderDock {
+  top: 76px;
+  right: clamp(22px, 3vw, 42px);
+  display: flex;
+  gap: 7px;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--haze) 56%, transparent);
+  background: color-mix(in srgb, var(--void) 42%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.wonderButton {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 7px 9px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--mute);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  transition:
+    color 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.wonderButton::before {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent, color-mix(in srgb, var(--accent) 18%, transparent), transparent);
+  opacity: 0;
+  transform: translateX(-70%);
+  transition:
+    opacity 180ms ease,
+    transform 420ms ease;
+  content: "";
+}
+
+.wonderButton svg,
+.wonderButton span {
+  position: relative;
+}
+
+.wonderButton:hover,
+.wonderButton[data-active="true"] {
+  color: var(--starlight);
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  box-shadow: 0 0 26px color-mix(in srgb, var(--accent) 12%, transparent);
+  transform: translateY(-1px);
+}
+
+.wonderButton:hover::before,
+.wonderButton[data-active="true"]::before {
+  opacity: 1;
+  transform: translateX(42%);
+}
+
+.journeyCaption {
+  left: 50%;
+  bottom: calc(var(--rail-height) + 26px);
+  width: min(540px, calc(100vw - 44px));
+  padding: 12px 0 0;
+  border-top: 1px solid var(--accent);
+  color: var(--mute);
+  font-size: 11px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.journeyCaption span {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--accent);
+}
+
+.journeyCaption strong {
+  display: block;
+  color: var(--starlight);
+  font-family: var(--font-spectral), Georgia, serif;
+  font-size: clamp(18px, 2vw, 24px);
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.25;
+  text-transform: none;
 }
 
 .compareLegend {
@@ -673,8 +771,43 @@
     flex-wrap: wrap;
   }
 
+  .wonderDock {
+    top: 64px;
+    left: 14px;
+    right: 14px;
+    justify-content: space-between;
+    gap: 5px;
+    padding: 5px;
+  }
+
+  .wonderButton {
+    flex: 1 1 0;
+    justify-content: center;
+    min-width: 0;
+    padding: 7px 5px;
+  }
+
+  .wonderButton span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .journeyCaption {
+    left: 20px;
+    right: 20px;
+    bottom: 142px;
+    width: auto;
+    transform: none;
+  }
+
   .switchNotice {
-    top: 62px;
+    top: 112px;
     width: calc(100vw - 40px);
     justify-content: center;
   }

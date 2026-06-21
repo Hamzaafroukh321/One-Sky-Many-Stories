@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CircleHelp, Pin, RotateCcw, X } from "lucide-react";
+import { CircleHelp, Eye, Play, Pin, RotateCcw, Sparkles, Volume2, VolumeX, X } from "lucide-react";
 import styles from "./sky-atlas.module.css";
 
 type StarTuple = [number, string, number, number, number, number];
@@ -70,11 +70,54 @@ type CultureSwitchNotice = {
   to: string;
 };
 
+type MemoryTrail = {
+  cultureId: string;
+  startedAt: number;
+};
+
+type BloomEvent = {
+  constellationId: string;
+  cultureId: string;
+  startedAt: number;
+};
+
+type JourneyStep = {
+  cultureId: string;
+  constellationId: string;
+  caption: string;
+};
+
 const cultureIds = ["greek", "chinese", "polynesian"];
 const defaultView: ViewState = { ra: 12.77, dec: 7, zoom: 340 };
 const SWITCH_RETRACT_MS = 300;
 const SWITCH_GAP_MS = 70;
 const SWITCH_GROW_MS = 400;
+const MEMORY_TRAIL_MS = 2200;
+const BLOOM_MS = 1350;
+const LENS_RADIUS = 168;
+
+const journeySteps: JourneyStep[] = [
+  {
+    cultureId: "greek",
+    constellationId: "CON western Sco",
+    caption: "The chase begins as a Greek scorpion.",
+  },
+  {
+    cultureId: "chinese",
+    constellationId: "CON chinese 024",
+    caption: "The same fire stars become a dragon's tail.",
+  },
+  {
+    cultureId: "polynesian",
+    constellationId: "CON hawaiian_starlines MAN",
+    caption: "Across the Pacific, the curve turns into a chief's fishline.",
+  },
+  {
+    cultureId: "greek",
+    constellationId: "CON western Ori",
+    caption: "Orion returns, but the sky remembers every reading.",
+  },
+];
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -401,10 +444,17 @@ export function SkyAtlas() {
   const dragRef = useRef<{ x: number; y: number; view: ViewState } | null>(null);
   const pointerRef = useRef({ x: 0, y: 0, active: false });
   const transitionRef = useRef<{ from: string; to: string; startedAt: number; sharedHips: number[] } | null>(null);
+  const memoryTrailsRef = useRef<MemoryTrail[]>([]);
+  const bloomRef = useRef<BloomEvent | null>(null);
   const ignitionStartedAtRef = useRef<number | null>(null);
   const illustrationCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const maskedIllustrationCacheRef = useRef<Map<string, HTMLCanvasElement>>(new Map());
   const heldSharedTimeoutRef = useRef<number | null>(null);
+  const audioRef = useRef<{
+    context: AudioContext;
+    hum: OscillatorNode;
+    gain: GainNode;
+  } | null>(null);
   const [stars, setStars] = useState<Star[]>([]);
   const [cultures, setCultures] = useState<Culture[]>([]);
   const [activeCultureId, setActiveCultureId] = useState("greek");
@@ -420,11 +470,25 @@ export function SkyAtlas() {
   const [cultureSwitchNotice, setCultureSwitchNotice] = useState<CultureSwitchNotice | null>(null);
   const [focusedSharedHips, setFocusedSharedHips] = useState<number[]>([]);
   const [heldSharedHips, setHeldSharedHips] = useState<number[]>([]);
+  const [mythLensEnabled, setMythLensEnabled] = useState(false);
+  const [sameStarsMode, setSameStarsMode] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [journeyActive, setJourneyActive] = useState(false);
+  const [journeyStepIndex, setJourneyStepIndex] = useState(0);
 
   const activeCulture = useMemo(
     () => cultures.find((culture) => culture.id === activeCultureId) ?? cultures[0],
     [activeCultureId, cultures],
   );
+  const lensCulture = useMemo(() => {
+    if (!activeCulture) {
+      return null;
+    }
+
+    const activeIndex = Math.max(0, cultureIds.indexOf(activeCulture.id));
+    const lensId = cultureIds[(activeIndex + 1) % cultureIds.length];
+    return cultures.find((culture) => culture.id === lensId) ?? null;
+  }, [activeCulture, cultures]);
   const pinnedCulture = useMemo(
     () => cultures.find((culture) => culture.id === pinnedCultureId) ?? null,
     [pinnedCultureId, cultures],
@@ -487,10 +551,25 @@ export function SkyAtlas() {
     const pinnedHips = new Set(pinnedCulture.constellations.flatMap((constellation) => constellation.lines.flat()));
     return new Set([...activeHips].filter((hip) => pinnedHips.has(hip)));
   }, [activeCulture, pinnedCulture]);
+  const sameStarsHips = useMemo(() => {
+    if (!activeCulture) {
+      return new Set<number>();
+    }
+
+    const activeHips = new Set(activeCulture.constellations.flatMap((constellation) => constellation.lines.flat()));
+    const otherHips = new Set(
+      cultures
+        .filter((culture) => culture.id !== activeCulture.id)
+        .flatMap((culture) => culture.constellations.flatMap((constellation) => constellation.lines.flat())),
+    );
+
+    return new Set([...activeHips].filter((hip) => otherHips.has(hip)));
+  }, [activeCulture, cultures]);
   const activePulseHips = useMemo(
-    () => new Set([...disagreementHips, ...focusedSharedHips, ...heldSharedHips]),
-    [disagreementHips, focusedSharedHips, heldSharedHips],
+    () => new Set([...disagreementHips, ...focusedSharedHips, ...heldSharedHips, ...(sameStarsMode ? sameStarsHips : [])]),
+    [disagreementHips, focusedSharedHips, heldSharedHips, sameStarsHips, sameStarsMode],
   );
+  const journeyStep = journeySteps[journeyStepIndex % journeySteps.length];
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -550,6 +629,95 @@ export function SkyAtlas() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      audioRef.current?.hum.stop();
+      void audioRef.current?.context.close();
+      audioRef.current = null;
+    };
+  }, []);
+
+  const ensureAudio = useCallback(() => {
+    if (audioRef.current) {
+      return audioRef.current.context;
+    }
+
+    const AudioContextCtor =
+      window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const context = new AudioContextCtor();
+    const hum = context.createOscillator();
+    const gain = context.createGain();
+
+    hum.type = "sine";
+    hum.frequency.value = 74;
+    gain.gain.value = 0.0001;
+    hum.connect(gain);
+    gain.connect(context.destination);
+    hum.start();
+    audioRef.current = { context, hum, gain };
+    return context;
+  }, []);
+
+  const setAmbientSound = useCallback(
+    (enabled: boolean) => {
+      if (!enabled) {
+        audioRef.current?.gain.gain.setTargetAtTime(0.0001, audioRef.current.context.currentTime, 0.06);
+        setSoundEnabled(false);
+        return;
+      }
+
+      const context = ensureAudio();
+      void context.resume();
+      audioRef.current?.gain.gain.setTargetAtTime(0.018, context.currentTime, 0.16);
+      setSoundEnabled(true);
+    },
+    [ensureAudio],
+  );
+
+  const playChime = useCallback(
+    (frequency = 520) => {
+      if (!soundEnabled) {
+        return;
+      }
+
+      const context = ensureAudio();
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+
+      oscillator.type = "triangle";
+      oscillator.frequency.setValueAtTime(frequency, context.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(frequency * 1.35, context.currentTime + 0.22);
+      gain.gain.setValueAtTime(0.0001, context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.04, context.currentTime + 0.018);
+      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.32);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start();
+      oscillator.stop(context.currentTime + 0.36);
+    },
+    [ensureAudio, soundEnabled],
+  );
+
+  const rememberCulture = useCallback((cultureId: string) => {
+    memoryTrailsRef.current = [
+      { cultureId, startedAt: performance.now() },
+      ...memoryTrailsRef.current.filter((trail) => trail.cultureId !== cultureId),
+    ].slice(0, 3);
+  }, []);
+
+  const triggerBloom = useCallback((constellationId: string | null, cultureId = activeCultureId) => {
+    if (!constellationId) {
+      bloomRef.current = null;
+      return;
+    }
+
+    bloomRef.current = {
+      constellationId,
+      cultureId,
+      startedAt: performance.now(),
+    };
+  }, [activeCultureId]);
 
   const findConstellationAt = useCallback(
     (x: number, y: number, culture: Culture | undefined) => {
@@ -636,21 +804,22 @@ export function SkyAtlas() {
 
     const drawCulture = (
       culture: Culture,
-      options: { alpha: number; progress: number; ghost?: boolean },
+      options: { alpha: number; progress: number; ghost?: boolean; memory?: boolean; ignoreFocus?: boolean },
     ) => {
-      const lineColor = options.ghost ? "#8A91A6" : culture.line;
-      const hasFocus = Boolean(selectedConstellationId || hoveredConstellationId);
+      const lineColor = options.ghost && !options.memory ? "#8A91A6" : culture.line;
+      const hasFocus = !options.ignoreFocus && Boolean(selectedConstellationId || hoveredConstellationId);
       context.save();
       context.lineCap = "round";
       context.lineJoin = "round";
-      context.setLineDash(options.ghost ? [7, 10] : []);
+      context.setLineDash(options.memory ? [1, 11] : options.ghost ? [7, 10] : []);
 
       for (const constellation of culture.constellations) {
-        const hovered = constellation.id === hoveredConstellationId;
-        const selected = constellation.id === selectedConstellationId;
+        const hovered = !options.ignoreFocus && constellation.id === hoveredConstellationId;
+        const selected = !options.ignoreFocus && constellation.id === selectedConstellationId;
         const awake = hovered || selected;
         const dimmed = hasFocus && !awake && !options.ghost;
-        const strokeAlpha = options.alpha * (dimmed ? 0.12 : selected ? 1 : hovered ? 1 : options.ghost ? 0.56 : 0.72);
+        const strokeAlpha =
+          options.alpha * (options.memory ? 0.78 : dimmed ? 0.12 : selected ? 1 : hovered ? 1 : options.ghost ? 0.56 : 0.72);
         const projectedLines = constellation.lines.map((line) =>
           line
             .map((hip) => starsByHip.get(hip))
@@ -672,9 +841,9 @@ export function SkyAtlas() {
         }
 
         context.strokeStyle = rgba(lineColor, strokeAlpha);
-        context.lineWidth = options.ghost ? 1.1 : selected ? 3.8 : hovered ? 3.2 : 1.6;
-        context.shadowColor = rgba(lineColor, options.ghost ? 0.12 : awake ? 0.58 : 0.24);
-        context.shadowBlur = options.ghost ? 0 : awake ? 11 : 5;
+        context.lineWidth = options.memory ? 1 : options.ghost ? 1.1 : selected ? 3.8 : hovered ? 3.2 : 1.6;
+        context.shadowColor = rgba(lineColor, options.memory ? 0.18 : options.ghost ? 0.12 : awake ? 0.58 : 0.24);
+        context.shadowBlur = options.memory ? 2 : options.ghost ? 0 : awake ? 11 : 5;
 
         for (const points of projectedLines) {
           drawProgressPath(context, points, options.progress);
@@ -865,6 +1034,120 @@ export function SkyAtlas() {
       context.restore();
     };
 
+    const drawBloom = (time: number) => {
+      const bloom = bloomRef.current;
+      if (!bloom || reducedMotion) {
+        return;
+      }
+
+      const elapsed = time - bloom.startedAt;
+      if (elapsed > BLOOM_MS) {
+        bloomRef.current = null;
+        return;
+      }
+
+      const culture = cultures.find((item) => item.id === bloom.cultureId);
+      const constellation = culture?.constellations.find((item) => item.id === bloom.constellationId);
+      if (!culture || !constellation) {
+        return;
+      }
+
+      const progress = easeOutCubic(elapsed / BLOOM_MS);
+      const alpha = 1 - progress;
+      const hips = constellationHipSet(constellation);
+
+      context.save();
+      context.globalCompositeOperation = "lighter";
+      context.strokeStyle = rgba(culture.accent, 0.34 * alpha);
+      context.fillStyle = rgba(culture.accent, 0.08 * alpha);
+      context.lineWidth = 1;
+
+      for (const hip of hips) {
+        const star = starsByHip.get(hip);
+        if (!star) {
+          continue;
+        }
+
+        const point = projectCurrent(star);
+        if (!point.visible) {
+          continue;
+        }
+
+        context.beginPath();
+        context.arc(point.x, point.y, 8 + progress * 34, 0, Math.PI * 2);
+        context.stroke();
+        context.beginPath();
+        context.arc(point.x, point.y, 2 + progress * 7, 0, Math.PI * 2);
+        context.fill();
+      }
+
+      context.restore();
+    };
+
+    const drawMythLens = (time: number) => {
+      if (!mythLensEnabled || !lensCulture || reducedMotion) {
+        return;
+      }
+
+      const pointer = pointerRef.current;
+      const centerX = pointer.active ? ((pointer.x + 1) / 2) * width : width * 0.62;
+      const centerY = pointer.active ? ((pointer.y + 1) / 2) * height : height * 0.44;
+      const radius = clamp(Math.min(width, height) * 0.2, 118, LENS_RADIUS);
+      const pulse = 0.5 + Math.sin(time * 0.002) * 0.5;
+
+      context.save();
+      context.beginPath();
+      context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      context.clip();
+
+      const shade = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+      shade.addColorStop(0, rgba(lensCulture.accent, 0.08));
+      shade.addColorStop(0.72, "rgba(8, 10, 16, 0.1)");
+      shade.addColorStop(1, "rgba(0, 0, 0, 0.24)");
+      context.fillStyle = shade;
+      context.fillRect(centerX - radius, centerY - radius, radius * 2, radius * 2);
+
+      drawCulture(lensCulture, { alpha: 0.95, progress: 1, ignoreFocus: true });
+      context.restore();
+
+      context.save();
+      context.globalCompositeOperation = "lighter";
+      context.strokeStyle = rgba(lensCulture.accent, 0.72 + pulse * 0.14);
+      context.lineWidth = 1.2;
+      context.beginPath();
+      context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      context.stroke();
+      context.strokeStyle = rgba(lensCulture.line, 0.22);
+      context.lineWidth = 9;
+      context.beginPath();
+      context.arc(centerX, centerY, radius + 2, -Math.PI * 0.2, Math.PI * (0.92 + pulse * 0.2));
+      context.stroke();
+
+      if (activeCulture) {
+        const activeHips = cultureHipSet(activeCulture);
+        const lensHips = cultureHipSet(lensCulture);
+        for (const hip of [...activeHips].filter((item) => lensHips.has(item)).slice(0, 28)) {
+          const star = starsByHip.get(hip);
+          if (!star) {
+            continue;
+          }
+
+          const point = projectCurrent(star);
+          const distance = Math.hypot(point.x - centerX, point.y - centerY);
+          if (!point.visible || distance > radius + 6) {
+            continue;
+          }
+
+          context.fillStyle = rgba(lensCulture.accent, 0.35 + pulse * 0.24);
+          context.beginPath();
+          context.arc(point.x, point.y, 2.2 + pulse * 1.8, 0, Math.PI * 2);
+          context.fill();
+        }
+      }
+
+      context.restore();
+    };
+
     const render = (time: number) => {
       if (time - lastFrame < 1000 / 45) {
         animationFrame = requestAnimationFrame(render);
@@ -932,19 +1215,43 @@ export function SkyAtlas() {
           : easeOutCubic((ignitionElapsed - distanceFromCenter * 420) / 900);
         const focused = focusHips.has(star.hip);
         const sharedPulse = activePulseHips.has(star.hip);
-        const focusMultiplier = focused ? 1.72 : sharedPulse ? 1.42 : hasStarFocus || selectedConstellation ? 0.52 : 1;
+        const focusMultiplier = focused
+          ? 1.72
+          : sharedPulse
+            ? sameStarsMode
+              ? 1.7
+              : 1.42
+            : hasStarFocus || selectedConstellation || sameStarsMode
+              ? 0.5
+              : 1;
         const alpha = clamp(baseAlpha * twinkle * skyIgnition * starIgnition * focusMultiplier, 0, 1);
 
         drawStar(context, x, y, star.mag, star.ci, alpha);
       }
       context.restore();
 
+      drawBloom(time);
       const illustratedConstellation =
         selectedConstellation ??
         activeCulture?.constellations.find((constellation) => constellation.id === hoveredConstellationId) ??
         null;
       drawIllustrationGhost(illustratedConstellation, activeCulture);
       drawDisagreementPulse(time);
+
+      memoryTrailsRef.current = memoryTrailsRef.current.filter((trail) => time - trail.startedAt < MEMORY_TRAIL_MS);
+      for (const trail of memoryTrailsRef.current) {
+        if (trail.cultureId === activeCulture?.id) {
+          continue;
+        }
+
+        const culture = cultures.find((item) => item.id === trail.cultureId);
+        if (!culture) {
+          continue;
+        }
+
+        const fade = 1 - (time - trail.startedAt) / MEMORY_TRAIL_MS;
+        drawCulture(culture, { alpha: fade * 0.34, progress: 1, memory: true, ignoreFocus: true });
+      }
 
       if (pinnedCulture && pinnedCulture.id !== activeCulture?.id) {
         drawCulture(pinnedCulture, { alpha: 0.25, progress: 1, ghost: true });
@@ -977,6 +1284,8 @@ export function SkyAtlas() {
         }
       }
 
+      drawMythLens(time);
+
       if (time - lastReadout > 360) {
         lastReadout = time;
         setViewReadout(viewRef.current);
@@ -999,8 +1308,11 @@ export function SkyAtlas() {
     cultures,
     hoveredHips,
     hoveredConstellationId,
+    lensCulture,
+    mythLensEnabled,
     pinnedCulture,
     reducedMotion,
+    sameStarsMode,
     selectedConstellation,
     selectedConstellationId,
     selectedHips,
@@ -1020,6 +1332,7 @@ export function SkyAtlas() {
     const sharedHips = [...cultureHipSet(toCulture)].filter((hip) => fromHips.has(hip));
     const from = activeCulture?.label ?? activeCultureId;
     const to = toCulture?.label ?? cultureId;
+    rememberCulture(activeCultureId);
     transitionRef.current = {
       from: activeCultureId,
       to: cultureId,
@@ -1034,6 +1347,7 @@ export function SkyAtlas() {
     setHeldSharedHips([]);
     setCultureSwitchNotice({ id: Date.now(), from, to });
     setActiveCultureId(cultureId);
+    playChime(420 + sharedHips.length * 18);
   };
 
   const jumpToSharedFigure = (item: (typeof overlapInsights)[number]) => {
@@ -1056,6 +1370,7 @@ export function SkyAtlas() {
     }, 2800);
 
     if (item.cultureId !== activeCultureId) {
+      rememberCulture(activeCultureId);
       transitionRef.current = {
         from: activeCultureId,
         to: item.cultureId,
@@ -1067,6 +1382,8 @@ export function SkyAtlas() {
     }
 
     setSelectedConstellationId(item.constellationId);
+    triggerBloom(item.constellationId, item.cultureId);
+    playChime(610 + item.count * 20);
   };
 
   const resetView = () => {
@@ -1128,6 +1445,10 @@ export function SkyAtlas() {
       const rect = event.currentTarget.getBoundingClientRect();
       const target = findConstellationAt(event.clientX - rect.left, event.clientY - rect.top, activeCulture);
       setSelectedConstellationId(target?.id ?? null);
+      triggerBloom(target?.id ?? null);
+      if (target) {
+        playChime(560);
+      }
     }
   };
 
@@ -1142,10 +1463,48 @@ export function SkyAtlas() {
   };
 
   useEffect(() => {
+    if (!journeyActive || cultures.length === 0) {
+      return;
+    }
+
+    const step = journeySteps[journeyStepIndex % journeySteps.length];
+    const culture = cultures.find((item) => item.id === step.cultureId);
+    const constellation = culture?.constellations.find((item) => item.id === step.constellationId);
+
+    if (!culture || !constellation) {
+      return;
+    }
+
+    setHasExplored(true);
+    setSameStarsMode(true);
+    setMythLensEnabled(true);
+    setHoveredConstellationId(null);
+    setHoverTarget(null);
+
+    const stepHips = [...constellationHipSet(constellation)];
+    setHeldSharedHips(stepHips);
+
+    if (activeCultureId !== step.cultureId) {
+      setCulture(step.cultureId);
+    }
+
+    setSelectedConstellationId(step.constellationId);
+    triggerBloom(step.constellationId, step.cultureId);
+    playChime(640 + (journeyStepIndex % journeySteps.length) * 80);
+
+    const timeout = window.setTimeout(() => {
+      setJourneyStepIndex((current) => current + 1);
+    }, 3800);
+
+    return () => window.clearTimeout(timeout);
+  }, [activeCultureId, cultures, journeyActive, journeyStepIndex, playChime, triggerBloom]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setSelectedConstellationId(null);
         setShowSources(false);
+        setJourneyActive(false);
       }
     };
 
@@ -1232,6 +1591,76 @@ export function SkyAtlas() {
         </div>
       </header>
 
+      <div className={styles.wonderDock} aria-label="Wonder controls">
+        <button
+          className={styles.wonderButton}
+          type="button"
+          aria-pressed={mythLensEnabled}
+          data-active={mythLensEnabled}
+          onClick={() => {
+            setHasExplored(true);
+            setMythLensEnabled((enabled) => !enabled);
+            playChime(520);
+          }}
+        >
+          <Eye aria-hidden="true" size={14} strokeWidth={1.8} />
+          <span>Lens</span>
+        </button>
+        <button
+          className={styles.wonderButton}
+          type="button"
+          aria-pressed={sameStarsMode}
+          data-active={sameStarsMode}
+          onClick={() => {
+            setHasExplored(true);
+            setSameStarsMode((enabled) => !enabled);
+            playChime(680);
+          }}
+        >
+          <Sparkles aria-hidden="true" size={14} strokeWidth={1.8} />
+          <span>Same Stars</span>
+        </button>
+        <button
+          className={styles.wonderButton}
+          type="button"
+          aria-pressed={journeyActive}
+          data-active={journeyActive}
+          onClick={() => {
+            setHasExplored(true);
+            setJourneyActive((enabled) => !enabled);
+            setJourneyStepIndex(0);
+            if (journeyActive) {
+              setHeldSharedHips([]);
+            }
+            playChime(journeyActive ? 380 : 760);
+          }}
+        >
+          <Play aria-hidden="true" size={14} strokeWidth={1.8} />
+          <span>Journey</span>
+        </button>
+        <button
+          className={styles.wonderButton}
+          type="button"
+          aria-pressed={soundEnabled}
+          data-active={soundEnabled}
+          onClick={() => setAmbientSound(!soundEnabled)}
+        >
+          {soundEnabled ? (
+            <Volume2 aria-hidden="true" size={14} strokeWidth={1.8} />
+          ) : (
+            <VolumeX aria-hidden="true" size={14} strokeWidth={1.8} />
+          )}
+          <span>Sound</span>
+        </button>
+      </div>
+
+      {journeyActive ? (
+        <div className={styles.journeyCaption} aria-live="polite">
+          <span>Sky Story Path</span>
+          <strong>{journeyStep.caption}</strong>
+        </div>
+      ) : null}
+
       <section className={styles.intro} aria-label="Current sky culture">
         <p>{activeCulture?.region ?? "Loading"}</p>
         <h1>{activeCulture?.label ?? "Sky"}</h1>
@@ -1276,7 +1705,10 @@ export function SkyAtlas() {
               className={styles.closeButton}
               type="button"
               aria-label="Close story panel"
-              onClick={() => setSelectedConstellationId(null)}
+              onClick={() => {
+                setSelectedConstellationId(null);
+                triggerBloom(null);
+              }}
             >
               <X aria-hidden="true" size={16} strokeWidth={1.8} />
             </button>

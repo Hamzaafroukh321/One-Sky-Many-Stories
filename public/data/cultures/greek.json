@@ -53,7 +53,31 @@
           28614
         ]
       ],
-      "myth": "Orion is the great hunter, a huge human figure drawn around the bright belt stars. In Greek tradition his pride and violence lead to his death, and the hunter is set in the sky with the scorpion that can still chase him below the horizon."
+      "myth": "Orion is the great hunter, a huge human figure drawn around the bright belt stars. In Greek tradition his pride and violence lead to his death, and the hunter is set in the sky with the scorpion that can still chase him below the horizon.",
+      "image": {
+        "src": "/data/cultures/greek/illustrations/orion.webp",
+        "size": [
+          512,
+          512
+        ],
+        "anchors": [
+          {
+            "imgX": 59,
+            "imgY": 11,
+            "hip": 27913
+          },
+          {
+            "imgX": 329,
+            "imgY": 477,
+            "hip": 27366
+          },
+          {
+            "imgX": 421,
+            "imgY": 91,
+            "hip": 22449
+          }
+        ]
+      }
     },
     {
       "id": "CON western UMa",
@@ -99,7 +123,31 @@
           54061
         ]
       ],
-      "myth": "Ursa Major is the Great Bear. Greek tellings often connect it with Callisto, transformed into a bear and then lifted among the stars, where the bear circles the northern sky without setting for many northern observers."
+      "myth": "Ursa Major is the Great Bear. Greek tellings often connect it with Callisto, transformed into a bear and then lifted among the stars, where the bear circles the northern sky without setting for many northern observers.",
+      "image": {
+        "src": "/data/cultures/greek/illustrations/ursa-major.webp",
+        "size": [
+          512,
+          512
+        ],
+        "anchors": [
+          {
+            "imgX": 26,
+            "imgY": 75,
+            "hip": 67301
+          },
+          {
+            "imgX": 452,
+            "imgY": 272,
+            "hip": 41704
+          },
+          {
+            "imgX": 258,
+            "imgY": 394,
+            "hip": 50372
+          }
+        ]
+      }
     },
     {
       "id": "CON western Sco",
@@ -129,7 +177,31 @@
           78820
         ]
       ],
-      "myth": "Scorpius is the scorpion sent against Orion. Its curved body and red Antares make the figure feel alive, and its rising as Orion leaves the sky turns the myth into a seasonal chase."
+      "myth": "Scorpius is the scorpion sent against Orion. Its curved body and red Antares make the figure feel alive, and its rising as Orion leaves the sky turns the myth into a seasonal chase.",
+      "image": {
+        "src": "/data/cultures/greek/illustrations/scorpius.webp",
+        "size": [
+          512,
+          512
+        ],
+        "anchors": [
+          {
+            "imgX": 447,
+            "imgY": 29,
+            "hip": 78820
+          },
+          {
+            "imgX": 62,
+            "imgY": 365,
+            "hip": 85927
+          },
+          {
+            "imgX": 217,
+            "imgY": 462,
+            "hip": 82729
+          }
+        ]
+      }
     },
     {
       "id": "CON western Cyg",
@@ -156,7 +228,31 @@
           95947
         ]
       ],
-      "myth": "Cygnus is the Swan, stretched along the Milky Way. Classical stories attach the bird to divine disguise, grief, and transformation, making the bright cross of stars a figure of passage between worlds."
+      "myth": "Cygnus is the Swan, stretched along the Milky Way. Classical stories attach the bird to divine disguise, grief, and transformation, making the bright cross of stars a figure of passage between worlds.",
+      "image": {
+        "src": "/data/cultures/greek/illustrations/cygnus.webp",
+        "size": [
+          512,
+          512
+        ],
+        "anchors": [
+          {
+            "imgX": 7,
+            "imgY": 382,
+            "hip": 107310
+          },
+          {
+            "imgX": 474,
+            "imgY": 46,
+            "hip": 94779
+          },
+          {
+            "imgX": 467,
+            "imgY": 453,
+            "hip": 95947
+          }
+        ]
+      }
     },
     {
       "id": "CON western Cas",
@@ -172,7 +268,31 @@
           746
         ]
       ],
-      "myth": "Cassiopeia is the seated queen whose boast about beauty brought danger to her kingdom. The compact W-shaped figure keeps her visible near the north celestial pole, turning vanity into a permanent warning."
+      "myth": "Cassiopeia is the seated queen whose boast about beauty brought danger to her kingdom. The compact W-shaped figure keeps her visible near the north celestial pole, turning vanity into a permanent warning.",
+      "image": {
+        "src": "/data/cultures/greek/illustrations/cassiopeia.webp",
+        "size": [
+          512,
+          512
+        ],
+        "anchors": [
+          {
+            "imgX": 390,
+            "imgY": 336,
+            "hip": 8886
+          },
+          {
+            "imgX": 163,
+            "imgY": 156,
+            "hip": 3179
+          },
+          {
+            "imgX": 73,
+            "imgY": 243,
+            "hip": 746
+          }
+        ]
+      }
     }
   ]
 }

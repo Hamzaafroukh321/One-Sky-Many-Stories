@@ -26,6 +26,11 @@ type Constellation = {
   romanization: string;
   lines: number[][];
   myth: string;
+  image?: {
+    src: string;
+    size: [number, number];
+    anchors: Array<{ imgX: number; imgY: number; hip: number }>;
+  };
 };
 
 type Culture = {
@@ -66,7 +71,7 @@ type CultureSwitchNotice = {
 };
 
 const cultureIds = ["greek", "chinese", "polynesian"];
-const defaultView: ViewState = { ra: 6.5, dec: 10, zoom: 520 };
+const defaultView: ViewState = { ra: 6.5, dec: 10, zoom: 650 };
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -101,14 +106,52 @@ function rgba(hex: string, alpha: number) {
   return `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`;
 }
 
-function starTint(ci: number, alpha: number) {
-  const t = clamp((ci + 0.3) / 2.3, 0, 1);
+function ciToRgb(ci: number) {
+  const t = clamp((ci + 0.3) / 1.8, 0, 1);
   const cool = { r: 207, g: 224, b: 255 };
   const warm = { r: 255, g: 218, b: 159 };
-  const r = Math.round(cool.r + (warm.r - cool.r) * t);
-  const g = Math.round(cool.g + (warm.g - cool.g) * t);
-  const b = Math.round(cool.b + (warm.b - cool.b) * t);
+  return {
+    r: Math.round(cool.r + (warm.r - cool.r) * t),
+    g: Math.round(cool.g + (warm.g - cool.g) * t),
+    b: Math.round(cool.b + (warm.b - cool.b) * t),
+  };
+}
+
+function starTint(ci: number, alpha: number) {
+  const { r, g, b } = ciToRgb(ci);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function drawStar(context: CanvasRenderingContext2D, x: number, y: number, mag: number, ci: number, alpha = 1) {
+  const brightness = clamp((6.5 - mag) / 8, 0, 1);
+  const coreRadius = Math.max(0.45, brightness * 1.45);
+  const haloRadius = coreRadius * (3 + brightness * 4);
+  const color = ciToRgb(ci);
+  const halo = context.createRadialGradient(x, y, 0, x, y, haloRadius);
+
+  halo.addColorStop(0, `rgba(${color.r}, ${color.g}, ${color.b}, ${0.26 * brightness * alpha})`);
+  halo.addColorStop(0.4, `rgba(${color.r}, ${color.g}, ${color.b}, ${0.06 * brightness * alpha})`);
+  halo.addColorStop(1, "rgba(0, 0, 0, 0)");
+  context.fillStyle = halo;
+  context.beginPath();
+  context.arc(x, y, haloRadius, 0, Math.PI * 2);
+  context.fill();
+
+  if (mag < 1.6) {
+    const bloomRadius = haloRadius * 2.2;
+    const bloom = context.createRadialGradient(x, y, 0, x, y, bloomRadius);
+    bloom.addColorStop(0, `rgba(${color.r}, ${color.g}, ${color.b}, ${0.09 * alpha})`);
+    bloom.addColorStop(1, "rgba(0, 0, 0, 0)");
+    context.fillStyle = bloom;
+    context.beginPath();
+    context.arc(x, y, bloomRadius, 0, Math.PI * 2);
+    context.fill();
+  }
+
+  context.fillStyle = `rgba(245, 247, 252, ${(0.65 + 0.35 * brightness) * alpha})`;
+  context.beginPath();
+  context.arc(x, y, coreRadius, 0, Math.PI * 2);
+  context.fill();
 }
 
 function toStar(tuple: StarTuple, index: number): Star {
@@ -256,12 +299,54 @@ function constellationHipSet(constellation: Constellation) {
   return new Set(constellation.lines.flatMap((line) => line));
 }
 
+function affineFromThreePoints(
+  source: Array<{ x: number; y: number }>,
+  target: Array<{ x: number; y: number }>,
+) {
+  const [s1, s2, s3] = source;
+  const [t1, t2, t3] = target;
+  const denominator =
+    s1.x * (s2.y - s3.y) +
+    s2.x * (s3.y - s1.y) +
+    s3.x * (s1.y - s2.y);
+
+  if (Math.abs(denominator) < 0.0001) {
+    return null;
+  }
+
+  const a =
+    (t1.x * (s2.y - s3.y) + t2.x * (s3.y - s1.y) + t3.x * (s1.y - s2.y)) /
+    denominator;
+  const c =
+    (t1.x * (s3.x - s2.x) + t2.x * (s1.x - s3.x) + t3.x * (s2.x - s1.x)) /
+    denominator;
+  const e =
+    (t1.x * (s2.x * s3.y - s3.x * s2.y) +
+      t2.x * (s3.x * s1.y - s1.x * s3.y) +
+      t3.x * (s1.x * s2.y - s2.x * s1.y)) /
+    denominator;
+  const b =
+    (t1.y * (s2.y - s3.y) + t2.y * (s3.y - s1.y) + t3.y * (s1.y - s2.y)) /
+    denominator;
+  const d =
+    (t1.y * (s3.x - s2.x) + t2.y * (s1.x - s3.x) + t3.y * (s2.x - s1.x)) /
+    denominator;
+  const f =
+    (t1.y * (s2.x * s3.y - s3.x * s2.y) +
+      t2.y * (s3.x * s1.y - s1.x * s3.y) +
+      t3.y * (s1.x * s2.y - s2.x * s1.y)) /
+    denominator;
+
+  return { a, b, c, d, e, f };
+}
+
 export function SkyAtlas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewRef = useRef<ViewState>(defaultView);
   const dragRef = useRef<{ x: number; y: number; view: ViewState } | null>(null);
   const transitionRef = useRef<{ from: string; to: string; startedAt: number } | null>(null);
   const ignitionStartedAtRef = useRef<number | null>(null);
+  const illustrationCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const [stars, setStars] = useState<Star[]>([]);
   const [cultures, setCultures] = useState<Culture[]>([]);
   const [activeCultureId, setActiveCultureId] = useState("greek");
@@ -315,6 +400,15 @@ export function SkyAtlas() {
       .sort((first, second) => second.count - first.count)
       .slice(0, 3);
   }, [activeCulture, cultures, selectedConstellation]);
+  const disagreementHips = useMemo(() => {
+    if (!activeCulture || !pinnedCulture || activeCulture.id === pinnedCulture.id) {
+      return new Set<number>();
+    }
+
+    const activeHips = new Set(activeCulture.constellations.flatMap((constellation) => constellation.lines.flat()));
+    const pinnedHips = new Set(pinnedCulture.constellations.flatMap((constellation) => constellation.lines.flat()));
+    return new Set([...activeHips].filter((hip) => pinnedHips.has(hip)));
+  }, [activeCulture, pinnedCulture]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -352,6 +446,20 @@ export function SkyAtlas() {
       canceled = true;
     };
   }, []);
+
+  useEffect(() => {
+    for (const imageSrc of cultures.flatMap((culture) =>
+      culture.constellations.flatMap((constellation) => (constellation.image ? [constellation.image.src] : [])),
+    )) {
+      if (illustrationCacheRef.current.has(imageSrc)) {
+        continue;
+      }
+
+      const image = new Image();
+      image.src = imageSrc;
+      illustrationCacheRef.current.set(imageSrc, image);
+    }
+  }, [cultures]);
 
   const findConstellationAt = useCallback(
     (x: number, y: number, culture: Culture | undefined) => {
@@ -469,7 +577,9 @@ export function SkyAtlas() {
         }
 
         context.strokeStyle = rgba(lineColor, strokeAlpha);
-        context.lineWidth = options.ghost ? 1.1 : hovered ? 3 : 1.35;
+        context.lineWidth = options.ghost ? 1.1 : hovered ? 3.2 : 1.6;
+        context.shadowColor = rgba(lineColor, options.ghost ? 0.12 : hovered ? 0.5 : 0.24);
+        context.shadowBlur = options.ghost ? 0 : hovered ? 9 : 5;
 
         for (const points of projectedLines) {
           drawProgressPath(context, points, options.progress);
@@ -502,6 +612,85 @@ export function SkyAtlas() {
             context.restore();
           }
         }
+      }
+
+      context.restore();
+    };
+
+    const drawIllustrationGhost = (constellation: Constellation | null, culture: Culture | undefined) => {
+      if (!constellation?.image || !culture) {
+        return;
+      }
+
+      const image = illustrationCacheRef.current.get(constellation.image.src);
+      if (!image?.complete || image.naturalWidth === 0) {
+        return;
+      }
+
+      const source = constellation.image.anchors.slice(0, 3).map((anchor) => ({
+        x: anchor.imgX,
+        y: anchor.imgY,
+      }));
+      const target = constellation.image.anchors.slice(0, 3).map((anchor) => {
+        const star = starsByHip.get(anchor.hip);
+        return star ? projectStar(star, viewRef.current, width, height) : null;
+      });
+
+      if (target.some((point) => !point?.visible)) {
+        return;
+      }
+
+      const transform = affineFromThreePoints(
+        source,
+        target.map((point) => ({ x: point?.x ?? 0, y: point?.y ?? 0 })),
+      );
+
+      if (!transform) {
+        return;
+      }
+
+      context.save();
+      context.globalAlpha = reducedMotion ? 0.16 : 0.12 + Math.sin(performance.now() * 0.002) * 0.025;
+      context.globalCompositeOperation = "screen";
+      context.filter = `sepia(0.18) saturate(0.8) drop-shadow(0 0 14px ${culture.line})`;
+      context.setTransform(
+        transform.a,
+        transform.b,
+        transform.c,
+        transform.d,
+        transform.e,
+        transform.f,
+      );
+      context.drawImage(image, 0, 0, constellation.image.size[0], constellation.image.size[1]);
+      context.restore();
+      context.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0);
+    };
+
+    const drawDisagreementPulse = (time: number) => {
+      if (disagreementHips.size === 0) {
+        return;
+      }
+
+      const pulse = reducedMotion ? 0.45 : 0.32 + Math.sin(time * 0.0022) * 0.13;
+      context.save();
+      context.globalCompositeOperation = "lighter";
+      context.strokeStyle = rgba(activeCulture?.accent ?? "#E8D9A0", pulse);
+      context.lineWidth = 1;
+
+      for (const hip of disagreementHips) {
+        const star = starsByHip.get(hip);
+        if (!star) {
+          continue;
+        }
+
+        const point = projectStar(star, viewRef.current, width, height);
+        if (!point.visible || point.x < -12 || point.x > width + 12 || point.y < -12 || point.y > height + 12) {
+          continue;
+        }
+
+        context.beginPath();
+        context.arc(point.x, point.y, 5.5 + pulse * 9, 0, Math.PI * 2);
+        context.stroke();
       }
 
       context.restore();
@@ -541,36 +730,32 @@ export function SkyAtlas() {
         };
       }
 
+      context.save();
+      context.globalCompositeOperation = "lighter";
       for (const star of stars) {
         const point = projectStar(star, viewRef.current, width, height);
         if (!point.visible || point.x < -24 || point.x > width + 24 || point.y < -24 || point.y > height + 24) {
           continue;
         }
 
-        const radius = Math.max(0.35, (6.5 - star.mag) * 0.45);
         const baseAlpha = Math.min(1, Math.max(0.25, (6.5 - star.mag) / 7));
-        const twinkle = reducedMotion ? 1 : 0.92 + Math.sin(time * 0.001 + star.phase) * 0.08;
+        const twinkle = reducedMotion ? 1 : 0.97 + Math.sin(time * 0.001 + star.phase) * 0.035;
         const distanceFromCenter = Math.hypot(point.x - width / 2, point.y - height / 2) / Math.max(width, height);
         const starIgnition = reducedMotion
           ? 1
           : easeOutCubic((ignitionElapsed - distanceFromCenter * 420) / 900);
         const alpha = baseAlpha * twinkle * skyIgnition * starIgnition;
 
-        if (radius > 1.25) {
-          const glow = context.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius * 5.2);
-          glow.addColorStop(0, starTint(star.ci, alpha * 0.58));
-          glow.addColorStop(1, "rgba(237, 239, 247, 0)");
-          context.fillStyle = glow;
-          context.beginPath();
-          context.arc(point.x, point.y, radius * 5.2, 0, Math.PI * 2);
-          context.fill();
-        }
-
-        context.fillStyle = starTint(star.ci, alpha);
-        context.beginPath();
-        context.arc(point.x, point.y, radius, 0, Math.PI * 2);
-        context.fill();
+        drawStar(context, point.x, point.y, star.mag, star.ci, alpha);
       }
+      context.restore();
+
+      const illustratedConstellation =
+        selectedConstellation ??
+        activeCulture?.constellations.find((constellation) => constellation.id === hoveredConstellationId) ??
+        null;
+      drawIllustrationGhost(illustratedConstellation, activeCulture);
+      drawDisagreementPulse(time);
 
       if (pinnedCulture && pinnedCulture.id !== activeCulture?.id) {
         drawCulture(pinnedCulture, { alpha: 0.25, progress: 1, ghost: true });
@@ -620,9 +805,11 @@ export function SkyAtlas() {
   }, [
     activeCulture,
     cultures,
+    disagreementHips,
     hoveredConstellationId,
     pinnedCulture,
     reducedMotion,
+    selectedConstellation,
     skyReady,
     stars,
     starsByHip,
@@ -810,7 +997,7 @@ export function SkyAtlas() {
         </div>
       ) : null}
 
-      {hoverTarget ? (
+      {hoverTarget && !selectedConstellation ? (
         <div
           className={styles.hoverCard}
           style={

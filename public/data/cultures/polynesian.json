@@ -33,7 +33,31 @@
           78265
         ]
       ],
-      "myth": "Manaiakalani, the Chief's Fishline, connects bright stars into the great fishhook associated with Maui. It is a navigational and story-bearing line, turning the sky into a tool for voyaging."
+      "myth": "Manaiakalani, the Chief's Fishline, connects bright stars into the great fishhook associated with Maui. It is a navigational and story-bearing line, turning the sky into a tool for voyaging.",
+      "image": {
+        "src": "/data/cultures/polynesian/illustrations/manaia.webp",
+        "size": [
+          512,
+          512
+        ],
+        "anchors": [
+          {
+            "imgX": 158,
+            "imgY": 105,
+            "hip": 84012
+          },
+          {
+            "imgX": 500,
+            "imgY": 106,
+            "hip": 76470
+          },
+          {
+            "imgX": 222,
+            "imgY": 399,
+            "hip": 84143
+          }
+        ]
+      }
     },
     {
       "id": "CON hawaiian_starlines IWI",
@@ -59,7 +83,31 @@
           61084
         ]
       ],
-      "myth": "Ka Iwikuamoo, the Backbone, is a long guiding structure across the sky. Hawaiian starlines emphasize orientation, genealogy, and ocean travel as much as pictured figures."
+      "myth": "Ka Iwikuamoo, the Backbone, is a long guiding structure across the sky. Hawaiian starlines emphasize orientation, genealogy, and ocean travel as much as pictured figures.",
+      "image": {
+        "src": "/data/cultures/polynesian/illustrations/kuamoobig.webp",
+        "size": [
+          512,
+          512
+        ],
+        "anchors": [
+          {
+            "imgX": 91,
+            "imgY": 52,
+            "hip": 53910
+          },
+          {
+            "imgX": 503,
+            "imgY": 76,
+            "hip": 59199
+          },
+          {
+            "imgX": 235,
+            "imgY": 260,
+            "hip": 69673
+          }
+        ]
+      }
     },
     {
       "id": "CON hawaiian_starlines NAH",
@@ -124,7 +172,31 @@
           100453
         ]
       ],
-      "myth": "Navigator's Triangle is a practical oceanic figure. It draws a compact triangle from bright stars and treats the sky as a living compass for movement across the Pacific."
+      "myth": "Navigator's Triangle is a practical oceanic figure. It draws a compact triangle from bright stars and treats the sky as a living compass for movement across the Pacific.",
+      "image": {
+        "src": "/data/cultures/polynesian/illustrations/waa2.webp",
+        "size": [
+          512,
+          512
+        ],
+        "anchors": [
+          {
+            "imgX": 113,
+            "imgY": 63,
+            "hip": 102098
+          },
+          {
+            "imgX": 438,
+            "imgY": 99,
+            "hip": 91262
+          },
+          {
+            "imgX": 255,
+            "imgY": 423,
+            "hip": 97649
+          }
+        ]
+      }
     }
   ]
 }

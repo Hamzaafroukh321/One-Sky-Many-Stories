@@ -4,6 +4,14 @@ import path from "node:path";
 type RawConstellation = {
   id: string;
   lines?: number[][];
+  image?: {
+    file: string;
+    size: [number, number];
+    anchors: Array<{
+      pos: [number, number];
+      hip: number;
+    }>;
+  };
   common_name?: {
     english?: string;
     native?: string;
@@ -164,6 +172,15 @@ async function fetchText(url: string) {
   return response.text();
 }
 
+async function fetchBytes(url: string) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+  }
+
+  return Buffer.from(await response.arrayBuffer());
+}
+
 function parseCsvLine(line: string) {
   const cells: string[] = [];
   let current = "";
@@ -262,12 +279,14 @@ async function buildCulture(culture: CultureSpec, hipSet: Set<number>) {
   const url = `${STELLARIUM_BASE}/${culture.sourceFolder}/index.json`;
   const index = JSON.parse(await fetchText(url)) as CultureIndex;
   const byId = new Map(index.constellations.map((constellation) => [constellation.id, constellation]));
+  const illustrationDir = path.join(CULTURES_DIR, culture.id, "illustrations");
+  await mkdir(illustrationDir, { recursive: true });
 
-  const constellations = culture.storyNotes.flatMap((story) => {
+  const constellations = await Promise.all(culture.storyNotes.map(async (story) => {
     const constellation = byId.get(story.id);
     if (!constellation) {
       console.warn(`${culture.id}: missing ${story.id}`);
-      return [];
+      return null;
     }
 
     const lines = cleanSegments(
@@ -278,20 +297,54 @@ async function buildCulture(culture: CultureSpec, hipSet: Set<number>) {
 
     if (lines.length === 0) {
       console.warn(`${culture.id}: ${story.id} has no drawable lines after validation.`);
-      return [];
+      return null;
     }
 
-    return [
-      {
-        id: constellation.id,
-        name: constellation.common_name?.english ?? constellation.id,
-        nativeName: constellation.common_name?.native ?? "",
-        romanization: constellation.common_name?.pronounce ?? "",
-        lines,
-        myth: story.myth,
-      },
-    ];
-  });
+    let image:
+      | {
+          src: string;
+          size: [number, number];
+          anchors: Array<{ imgX: number; imgY: number; hip: number }>;
+        }
+      | undefined;
+
+    if (constellation.image?.file && constellation.image.anchors.length >= 3) {
+      const fileName = path.basename(constellation.image.file);
+      const imageUrl = `${STELLARIUM_BASE}/${culture.sourceFolder}/${constellation.image.file}`;
+      const imagePath = path.join(illustrationDir, fileName);
+      const usableAnchors = constellation.image.anchors
+        .filter((anchor) => hipSet.has(anchor.hip))
+        .slice(0, 3)
+        .map((anchor) => ({
+          imgX: anchor.pos[0],
+          imgY: anchor.pos[1],
+          hip: anchor.hip,
+        }));
+
+      if (usableAnchors.length >= 3) {
+        await writeFile(imagePath, await fetchBytes(imageUrl));
+        image = {
+          src: `/data/cultures/${culture.id}/illustrations/${fileName}`,
+          size: constellation.image.size,
+          anchors: usableAnchors,
+        };
+      } else {
+        console.warn(`${culture.label} / ${constellation.common_name?.english ?? constellation.id}: illustration skipped because fewer than 3 anchors are in the filtered star set.`);
+      }
+    }
+
+    return {
+      id: constellation.id,
+      name: constellation.common_name?.english ?? constellation.id,
+      nativeName: constellation.common_name?.native ?? "",
+      romanization: constellation.common_name?.pronounce ?? "",
+      lines,
+      myth: story.myth,
+      ...(image ? { image } : {}),
+    };
+  }));
+
+  const drawableConstellations = constellations.filter((constellation) => constellation !== null);
 
   const payload = {
     id: culture.id,
@@ -301,7 +354,7 @@ async function buildCulture(culture: CultureSpec, hipSet: Set<number>) {
     line: culture.line,
     license: culture.license,
     source: culture.source,
-    constellations,
+    constellations: drawableConstellations,
   };
 
   await writeFile(
@@ -309,7 +362,7 @@ async function buildCulture(culture: CultureSpec, hipSet: Set<number>) {
     JSON.stringify(payload, null, 2),
     "utf8",
   );
-  console.log(`Wrote ${culture.label}: ${constellations.length} constellations.`);
+  console.log(`Wrote ${culture.label}: ${drawableConstellations.length} constellations.`);
 }
 
 async function main() {

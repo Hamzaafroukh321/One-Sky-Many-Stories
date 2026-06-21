@@ -40,8 +40,11 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   opacity: 1;
+  visibility: visible;
   pointer-events: none;
-  transition: opacity 900ms ease;
+  transition:
+    opacity 900ms ease,
+    visibility 0s linear 900ms;
 }
 
 .loadingVeil span {
@@ -64,6 +67,7 @@
 
 .shell[data-ready="true"] .loadingVeil {
   opacity: 0;
+  visibility: hidden;
 }
 
 .topBar {
@@ -199,8 +203,8 @@
 }
 
 .compareLegend {
-  left: clamp(24px, 6vw, 86px);
-  bottom: calc(var(--rail-height) + 18px);
+  top: 76px;
+  left: clamp(24px, 3vw, 42px);
   display: flex;
   gap: 14px;
   padding: 9px 0;
@@ -577,6 +581,7 @@
   .compareLegend {
     left: 20px;
     right: 20px;
+    top: auto;
     bottom: 132px;
     flex-wrap: wrap;
   }

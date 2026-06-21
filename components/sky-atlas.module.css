@@ -272,15 +272,21 @@
 }
 
 .hoverCard {
-  left: clamp(20px, var(--hover-x), calc(100vw - 230px));
-  top: clamp(74px, calc(var(--hover-y) - 76px), calc(100vh - var(--rail-height) - 126px));
+  left: clamp(20px, calc(var(--hover-x) + 28px), calc(100vw - 270px));
+  top: clamp(74px, calc(var(--hover-y) - 96px), calc(100vh - var(--rail-height) - 150px));
   width: 210px;
+  min-height: 92px;
   padding: 12px 13px;
   border-left: 1px solid var(--accent);
   background: color-mix(in srgb, var(--ink) 84%, transparent);
   backdrop-filter: blur(10px);
   pointer-events: none;
   animation: hoverCardIn 180ms ease-out both;
+}
+
+.hoverCard[data-has-image="true"] {
+  width: 288px;
+  padding-right: 104px;
 }
 
 .hoverCard::before {
@@ -291,6 +297,19 @@
   height: 1px;
   background: var(--accent);
   content: "";
+}
+
+.hoverFigure {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  width: 92px;
+  height: 92px;
+  object-fit: contain;
+  opacity: 0.78;
+  filter: grayscale(1) contrast(1.2) brightness(1.2) sepia(0.22);
+  mix-blend-mode: screen;
+  pointer-events: none;
 }
 
 .hoverCard span {

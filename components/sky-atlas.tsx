@@ -60,6 +60,7 @@ type HoverTarget = {
   id: string;
   name: string;
   nativeName: string;
+  imageSrc?: string;
   x: number;
   y: number;
 };
@@ -508,6 +509,7 @@ export function SkyAtlas() {
         id: best.constellation.id,
         name: best.constellation.name,
         nativeName: best.constellation.nativeName,
+        imageSrc: best.constellation.image?.src,
         x: best.centroid?.x ?? x,
         y: best.centroid?.y ?? y,
       };
@@ -640,30 +642,65 @@ export function SkyAtlas() {
         return;
       }
 
-      const transform = affineFromThreePoints(
-        source,
-        target.map((point) => ({ x: point?.x ?? 0, y: point?.y ?? 0 })),
+      const projectedAnchors = target.map((point) => ({ x: point?.x ?? 0, y: point?.y ?? 0 }));
+      const sourceCenter = source.reduce(
+        (center, point) => ({ x: center.x + point.x / source.length, y: center.y + point.y / source.length }),
+        { x: 0, y: 0 },
       );
+      const targetCenter = projectedAnchors.reduce(
+        (center, point) => ({
+          x: center.x + point.x / projectedAnchors.length,
+          y: center.y + point.y / projectedAnchors.length,
+        }),
+        { x: 0, y: 0 },
+      );
+      let farthestPair: [number, number] = [0, 1];
+      let farthestDistance = 0;
 
-      if (!transform) {
-        return;
+      for (let first = 0; first < source.length; first += 1) {
+        for (let second = first + 1; second < source.length; second += 1) {
+          const distance = Math.hypot(source[second].x - source[first].x, source[second].y - source[first].y);
+          if (distance > farthestDistance) {
+            farthestDistance = distance;
+            farthestPair = [first, second];
+          }
+        }
       }
 
-      context.save();
-      context.globalAlpha = reducedMotion ? 0.16 : 0.12 + Math.sin(performance.now() * 0.002) * 0.025;
-      context.globalCompositeOperation = "screen";
-      context.filter = `sepia(0.18) saturate(0.8) drop-shadow(0 0 14px ${culture.line})`;
-      context.setTransform(
-        transform.a,
-        transform.b,
-        transform.c,
-        transform.d,
-        transform.e,
-        transform.f,
+      const sourceStart = source[farthestPair[0]];
+      const sourceEnd = source[farthestPair[1]];
+      const targetStart = projectedAnchors[farthestPair[0]];
+      const targetEnd = projectedAnchors[farthestPair[1]];
+      const sourceAngle = Math.atan2(sourceEnd.y - sourceStart.y, sourceEnd.x - sourceStart.x);
+      const targetAngle = Math.atan2(targetEnd.y - targetStart.y, targetEnd.x - targetStart.x);
+      const sourceDistance = Math.max(1, Math.hypot(sourceEnd.x - sourceStart.x, sourceEnd.y - sourceStart.y));
+      const targetDistance = Math.hypot(targetEnd.x - targetStart.x, targetEnd.y - targetStart.y);
+      const scale = clamp((targetDistance / sourceDistance) * 1.08, 0.16, 0.52);
+      const clipRadius = clamp(
+        Math.max(...projectedAnchors.map((point) => Math.hypot(point.x - targetCenter.x, point.y - targetCenter.y))) +
+          82,
+        128,
+        280,
       );
-      context.drawImage(image, 0, 0, constellation.image.size[0], constellation.image.size[1]);
+
+      context.save();
+      context.beginPath();
+      context.ellipse(targetCenter.x, targetCenter.y, clipRadius * 1.05, clipRadius * 0.9, 0, 0, Math.PI * 2);
+      context.clip();
+      context.globalAlpha = reducedMotion ? 0.07 : 0.058 + Math.sin(performance.now() * 0.002) * 0.008;
+      context.globalCompositeOperation = "screen";
+      context.filter = `grayscale(1) contrast(1.58) brightness(1.24) sepia(0.22) drop-shadow(0 0 8px ${culture.line})`;
+      context.translate(targetCenter.x, targetCenter.y);
+      context.rotate(targetAngle - sourceAngle);
+      context.scale(scale, scale);
+      context.drawImage(
+        image,
+        -sourceCenter.x,
+        -sourceCenter.y,
+        constellation.image.size[0],
+        constellation.image.size[1],
+      );
       context.restore();
-      context.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0);
     };
 
     const drawDisagreementPulse = (time: number) => {
@@ -1006,7 +1043,11 @@ export function SkyAtlas() {
               "--hover-y": `${hoverTarget.y}px`,
             } as React.CSSProperties
           }
+          data-has-image={Boolean(hoverTarget.imageSrc)}
         >
+          {hoverTarget.imageSrc ? (
+            <img className={styles.hoverFigure} src={hoverTarget.imageSrc} alt="" aria-hidden="true" />
+          ) : null}
           <span>Figure under cursor</span>
           <strong>{hoverTarget.name}</strong>
           {hoverTarget.nativeName ? <em>{hoverTarget.nativeName}</em> : null}

@@ -72,6 +72,9 @@ type CultureSwitchNotice = {
 
 const cultureIds = ["greek", "chinese", "polynesian"];
 const defaultView: ViewState = { ra: 6.5, dec: 10, zoom: 650 };
+const SWITCH_RETRACT_MS = 300;
+const SWITCH_GAP_MS = 70;
+const SWITCH_GROW_MS = 400;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -341,6 +344,10 @@ function constellationHipSet(constellation: Constellation) {
   return new Set(constellation.lines.flatMap((line) => line));
 }
 
+function cultureHipSet(culture: Culture | undefined) {
+  return new Set(culture?.constellations.flatMap((constellation) => constellation.lines.flat()) ?? []);
+}
+
 function affineFromThreePoints(
   source: Array<{ x: number; y: number }>,
   target: Array<{ x: number; y: number }>,
@@ -386,7 +393,7 @@ export function SkyAtlas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewRef = useRef<ViewState>(defaultView);
   const dragRef = useRef<{ x: number; y: number; view: ViewState } | null>(null);
-  const transitionRef = useRef<{ from: string; to: string; startedAt: number } | null>(null);
+  const transitionRef = useRef<{ from: string; to: string; startedAt: number; sharedHips: number[] } | null>(null);
   const ignitionStartedAtRef = useRef<number | null>(null);
   const illustrationCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const maskedIllustrationCacheRef = useRef<Map<string, HTMLCanvasElement>>(new Map());
@@ -790,7 +797,12 @@ export function SkyAtlas() {
     };
 
     const drawDisagreementPulse = (time: number) => {
-      if (activePulseHips.size === 0) {
+      const pulseHips = new Set([
+        ...activePulseHips,
+        ...(transitionRef.current?.sharedHips ?? []),
+      ]);
+
+      if (pulseHips.size === 0) {
         return;
       }
 
@@ -800,7 +812,7 @@ export function SkyAtlas() {
       context.strokeStyle = rgba(activeCulture?.accent ?? "#E8D9A0", pulse);
       context.lineWidth = 1;
 
-      for (const hip of activePulseHips) {
+      for (const hip of pulseHips) {
         const star = starsByHip.get(hip);
         if (!star) {
           continue;
@@ -904,18 +916,20 @@ export function SkyAtlas() {
           const elapsed = time - transition.startedAt;
           const outgoing = cultures.find((culture) => culture.id === transition.from);
           const incoming = cultures.find((culture) => culture.id === transition.to);
+          const growStart = SWITCH_RETRACT_MS + SWITCH_GAP_MS;
+          const doneAt = growStart + SWITCH_GROW_MS;
 
-          if (outgoing && elapsed < 350) {
-            const outgoingProgress = 1 - easeInOutCubic(elapsed / 350);
-            drawCulture(outgoing, { alpha: outgoingProgress, progress: outgoingProgress });
+          if (outgoing && elapsed < SWITCH_RETRACT_MS) {
+            const outgoingProgress = 1 - easeOutCubic(elapsed / SWITCH_RETRACT_MS);
+            drawCulture(outgoing, { alpha: 1, progress: outgoingProgress });
           }
 
-          if (incoming && elapsed >= 430) {
-            const incomingProgress = easeOutCubic((elapsed - 430) / 450);
-            drawCulture(incoming, { alpha: incomingProgress, progress: incomingProgress });
+          if (incoming && elapsed >= growStart) {
+            const incomingProgress = easeOutCubic((elapsed - growStart) / SWITCH_GROW_MS);
+            drawCulture(incoming, { alpha: 1, progress: incomingProgress });
           }
 
-          if (elapsed > 900) {
+          if (elapsed > doneAt) {
             transitionRef.current = null;
           }
         }
@@ -955,12 +969,17 @@ export function SkyAtlas() {
       return;
     }
 
+    const fromCulture = cultures.find((culture) => culture.id === activeCultureId);
+    const toCulture = cultures.find((culture) => culture.id === cultureId);
+    const fromHips = cultureHipSet(fromCulture);
+    const sharedHips = [...cultureHipSet(toCulture)].filter((hip) => fromHips.has(hip));
     const from = activeCulture?.label ?? activeCultureId;
-    const to = cultures.find((culture) => culture.id === cultureId)?.label ?? cultureId;
+    const to = toCulture?.label ?? cultureId;
     transitionRef.current = {
       from: activeCultureId,
       to: cultureId,
       startedAt: performance.now(),
+      sharedHips,
     };
     setHasExplored(true);
     setSelectedConstellationId(null);
@@ -996,6 +1015,7 @@ export function SkyAtlas() {
         from: activeCultureId,
         to: item.cultureId,
         startedAt: performance.now(),
+        sharedHips: item.sharedHips,
       };
       setCultureSwitchNotice({ id: Date.now(), from, to });
       setActiveCultureId(item.cultureId);

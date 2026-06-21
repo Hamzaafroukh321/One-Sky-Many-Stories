@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CircleHelp, Eye, Play, Pin, RotateCcw, Sparkles, Volume2, VolumeX, X } from "lucide-react";
+import { CircleHelp, Play, Pin, RotateCcw, Sparkles, Volume2, VolumeX, X } from "lucide-react";
 import styles from "./sky-atlas.module.css";
 
 type StarTuple = [number, string, number, number, number, number];
@@ -94,7 +94,6 @@ const SWITCH_GAP_MS = 70;
 const SWITCH_GROW_MS = 400;
 const MEMORY_TRAIL_MS = 2200;
 const BLOOM_MS = 1350;
-const LENS_RADIUS = 168;
 
 const journeySteps: JourneyStep[] = [
   {
@@ -470,7 +469,6 @@ export function SkyAtlas() {
   const [cultureSwitchNotice, setCultureSwitchNotice] = useState<CultureSwitchNotice | null>(null);
   const [focusedSharedHips, setFocusedSharedHips] = useState<number[]>([]);
   const [heldSharedHips, setHeldSharedHips] = useState<number[]>([]);
-  const [mythLensEnabled, setMythLensEnabled] = useState(false);
   const [sameStarsMode, setSameStarsMode] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [journeyActive, setJourneyActive] = useState(false);
@@ -480,15 +478,6 @@ export function SkyAtlas() {
     () => cultures.find((culture) => culture.id === activeCultureId) ?? cultures[0],
     [activeCultureId, cultures],
   );
-  const lensCulture = useMemo(() => {
-    if (!activeCulture) {
-      return null;
-    }
-
-    const activeIndex = Math.max(0, cultureIds.indexOf(activeCulture.id));
-    const lensId = cultureIds[(activeIndex + 1) % cultureIds.length];
-    return cultures.find((culture) => culture.id === lensId) ?? null;
-  }, [activeCulture, cultures]);
   const pinnedCulture = useMemo(
     () => cultures.find((culture) => culture.id === pinnedCultureId) ?? null,
     [pinnedCultureId, cultures],
@@ -556,15 +545,37 @@ export function SkyAtlas() {
       return new Set<number>();
     }
 
-    const activeHips = new Set(activeCulture.constellations.flatMap((constellation) => constellation.lines.flat()));
-    const otherHips = new Set(
-      cultures
+    if (selectedConstellation) {
+      const selectedStars = constellationHipSet(selectedConstellation);
+      const selectedOverlap = cultures
         .filter((culture) => culture.id !== activeCulture.id)
-        .flatMap((culture) => culture.constellations.flatMap((constellation) => constellation.lines.flat())),
-    );
+        .flatMap((culture) =>
+          culture.constellations.flatMap((constellation) =>
+            [...constellationHipSet(constellation)].filter((hip) => selectedStars.has(hip)),
+          ),
+        );
+      return new Set(selectedOverlap.slice(0, 18));
+    }
 
-    return new Set([...activeHips].filter((hip) => otherHips.has(hip)));
-  }, [activeCulture, cultures]);
+    let bestOverlap: number[] = [];
+    for (const constellation of activeCulture.constellations) {
+      const activeHips = constellationHipSet(constellation);
+      for (const culture of cultures) {
+        if (culture.id === activeCulture.id) {
+          continue;
+        }
+
+        for (const otherConstellation of culture.constellations) {
+          const overlap = [...constellationHipSet(otherConstellation)].filter((hip) => activeHips.has(hip));
+          if (overlap.length > bestOverlap.length) {
+            bestOverlap = overlap;
+          }
+        }
+      }
+    }
+
+    return new Set(bestOverlap.slice(0, 18));
+  }, [activeCulture, cultures, selectedConstellation]);
   const activePulseHips = useMemo(
     () => new Set([...disagreementHips, ...focusedSharedHips, ...heldSharedHips, ...(sameStarsMode ? sameStarsHips : [])]),
     [disagreementHips, focusedSharedHips, heldSharedHips, sameStarsHips, sameStarsMode],
@@ -1011,7 +1022,10 @@ export function SkyAtlas() {
       context.strokeStyle = rgba(activeCulture?.accent ?? "#E8D9A0", pulse);
       context.lineWidth = 1;
 
-      for (const hip of pulseHips) {
+      const hips = [...pulseHips].slice(0, width <= 720 ? 10 : 28);
+      const pulseRadius = width <= 720 ? 5 + pulse * 6 : 6 + pulse * 10;
+
+      for (const hip of hips) {
         const star = starsByHip.get(hip);
         if (!star) {
           continue;
@@ -1023,7 +1037,7 @@ export function SkyAtlas() {
         }
 
         context.beginPath();
-        context.arc(point.x, point.y, 6 + pulse * 10, 0, Math.PI * 2);
+        context.arc(point.x, point.y, pulseRadius, 0, Math.PI * 2);
         context.stroke();
         context.fillStyle = rgba(activeCulture?.accent ?? "#E8D9A0", pulse * 0.18);
         context.beginPath();
@@ -1055,94 +1069,44 @@ export function SkyAtlas() {
       const progress = easeOutCubic(elapsed / BLOOM_MS);
       const alpha = 1 - progress;
       const hips = constellationHipSet(constellation);
+      const points = [...hips]
+        .map((hip) => starsByHip.get(hip))
+        .filter((star): star is Star => Boolean(star))
+        .map((star) => projectCurrent(star))
+        .filter((point) => point.visible);
 
-      context.save();
-      context.globalCompositeOperation = "lighter";
-      context.strokeStyle = rgba(culture.accent, 0.34 * alpha);
-      context.fillStyle = rgba(culture.accent, 0.08 * alpha);
-      context.lineWidth = 1;
-
-      for (const hip of hips) {
-        const star = starsByHip.get(hip);
-        if (!star) {
-          continue;
-        }
-
-        const point = projectCurrent(star);
-        if (!point.visible) {
-          continue;
-        }
-
-        context.beginPath();
-        context.arc(point.x, point.y, 8 + progress * 34, 0, Math.PI * 2);
-        context.stroke();
-        context.beginPath();
-        context.arc(point.x, point.y, 2 + progress * 7, 0, Math.PI * 2);
-        context.fill();
-      }
-
-      context.restore();
-    };
-
-    const drawMythLens = (time: number) => {
-      if (!mythLensEnabled || !lensCulture || reducedMotion) {
+      if (points.length === 0) {
         return;
       }
 
-      const pointer = pointerRef.current;
-      const centerX = pointer.active ? ((pointer.x + 1) / 2) * width : width * 0.62;
-      const centerY = pointer.active ? ((pointer.y + 1) / 2) * height : height * 0.44;
-      const radius = clamp(Math.min(width, height) * 0.2, 118, LENS_RADIUS);
-      const pulse = 0.5 + Math.sin(time * 0.002) * 0.5;
-
-      context.save();
-      context.beginPath();
-      context.arc(centerX, centerY, radius, 0, Math.PI * 2);
-      context.clip();
-
-      const shade = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-      shade.addColorStop(0, rgba(lensCulture.accent, 0.08));
-      shade.addColorStop(0.72, "rgba(8, 10, 16, 0.1)");
-      shade.addColorStop(1, "rgba(0, 0, 0, 0.24)");
-      context.fillStyle = shade;
-      context.fillRect(centerX - radius, centerY - radius, radius * 2, radius * 2);
-
-      drawCulture(lensCulture, { alpha: 0.95, progress: 1, ignoreFocus: true });
-      context.restore();
+      const center = points.reduce(
+        (sum, point) => ({ x: sum.x + point.x / points.length, y: sum.y + point.y / points.length }),
+        { x: 0, y: 0 },
+      );
+      const clusterRadius = clamp(
+        Math.max(...points.map((point) => Math.hypot(point.x - center.x, point.y - center.y))),
+        38,
+        150,
+      );
 
       context.save();
       context.globalCompositeOperation = "lighter";
-      context.strokeStyle = rgba(lensCulture.accent, 0.72 + pulse * 0.14);
+      context.strokeStyle = rgba(culture.accent, 0.28 * alpha);
       context.lineWidth = 1.2;
       context.beginPath();
-      context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      context.arc(center.x, center.y, clusterRadius * (0.78 + progress * 0.72), 0, Math.PI * 2);
       context.stroke();
-      context.strokeStyle = rgba(lensCulture.line, 0.22);
-      context.lineWidth = 9;
+      context.strokeStyle = rgba(culture.line, 0.16 * alpha);
+      context.lineWidth = 7;
       context.beginPath();
-      context.arc(centerX, centerY, radius + 2, -Math.PI * 0.2, Math.PI * (0.92 + pulse * 0.2));
+      context.arc(center.x, center.y, clusterRadius * (0.68 + progress * 0.42), -Math.PI * 0.2, Math.PI * 1.2);
       context.stroke();
 
-      if (activeCulture) {
-        const activeHips = cultureHipSet(activeCulture);
-        const lensHips = cultureHipSet(lensCulture);
-        for (const hip of [...activeHips].filter((item) => lensHips.has(item)).slice(0, 28)) {
-          const star = starsByHip.get(hip);
-          if (!star) {
-            continue;
-          }
-
-          const point = projectCurrent(star);
-          const distance = Math.hypot(point.x - centerX, point.y - centerY);
-          if (!point.visible || distance > radius + 6) {
-            continue;
-          }
-
-          context.fillStyle = rgba(lensCulture.accent, 0.35 + pulse * 0.24);
-          context.beginPath();
-          context.arc(point.x, point.y, 2.2 + pulse * 1.8, 0, Math.PI * 2);
-          context.fill();
-        }
+      context.fillStyle = rgba(culture.accent, 0.16 * alpha);
+      for (const point of points) {
+        context.beginPath();
+        context.arc(point.x, point.y, 2.4 + progress * 2.6, 0, Math.PI * 2);
+        context.fill();
       }
 
       context.restore();
@@ -1239,18 +1203,20 @@ export function SkyAtlas() {
       drawDisagreementPulse(time);
 
       memoryTrailsRef.current = memoryTrailsRef.current.filter((trail) => time - trail.startedAt < MEMORY_TRAIL_MS);
-      for (const trail of memoryTrailsRef.current) {
-        if (trail.cultureId === activeCulture?.id) {
-          continue;
-        }
+      if (width > 720) {
+        for (const trail of memoryTrailsRef.current) {
+          if (trail.cultureId === activeCulture?.id) {
+            continue;
+          }
 
-        const culture = cultures.find((item) => item.id === trail.cultureId);
-        if (!culture) {
-          continue;
-        }
+          const culture = cultures.find((item) => item.id === trail.cultureId);
+          if (!culture) {
+            continue;
+          }
 
-        const fade = 1 - (time - trail.startedAt) / MEMORY_TRAIL_MS;
-        drawCulture(culture, { alpha: fade * 0.34, progress: 1, memory: true, ignoreFocus: true });
+          const fade = 1 - (time - trail.startedAt) / MEMORY_TRAIL_MS;
+          drawCulture(culture, { alpha: fade * 0.34, progress: 1, memory: true, ignoreFocus: true });
+        }
       }
 
       if (pinnedCulture && pinnedCulture.id !== activeCulture?.id) {
@@ -1284,8 +1250,6 @@ export function SkyAtlas() {
         }
       }
 
-      drawMythLens(time);
-
       if (time - lastReadout > 360) {
         lastReadout = time;
         setViewReadout(viewRef.current);
@@ -1308,8 +1272,6 @@ export function SkyAtlas() {
     cultures,
     hoveredHips,
     hoveredConstellationId,
-    lensCulture,
-    mythLensEnabled,
     pinnedCulture,
     reducedMotion,
     sameStarsMode,
@@ -1321,9 +1283,13 @@ export function SkyAtlas() {
     starsByHip,
   ]);
 
-  const setCulture = (cultureId: string) => {
+  const setCulture = (cultureId: string, options: { keepJourney?: boolean } = {}) => {
     if (cultureId === activeCultureId) {
       return;
+    }
+
+    if (!options.keepJourney) {
+      setJourneyActive(false);
     }
 
     const fromCulture = cultures.find((culture) => culture.id === activeCultureId);
@@ -1355,6 +1321,7 @@ export function SkyAtlas() {
     const to = item.culture;
 
     setHasExplored(true);
+    setJourneyActive(false);
     setHoveredConstellationId(null);
     setHoverTarget(null);
     setFocusedSharedHips([]);
@@ -1477,7 +1444,6 @@ export function SkyAtlas() {
 
     setHasExplored(true);
     setSameStarsMode(true);
-    setMythLensEnabled(true);
     setHoveredConstellationId(null);
     setHoverTarget(null);
 
@@ -1485,7 +1451,7 @@ export function SkyAtlas() {
     setHeldSharedHips(stepHips);
 
     if (activeCultureId !== step.cultureId) {
-      setCulture(step.cultureId);
+      setCulture(step.cultureId, { keepJourney: true });
     }
 
     setSelectedConstellationId(step.constellationId);
@@ -1595,25 +1561,16 @@ export function SkyAtlas() {
         <button
           className={styles.wonderButton}
           type="button"
-          aria-pressed={mythLensEnabled}
-          data-active={mythLensEnabled}
-          onClick={() => {
-            setHasExplored(true);
-            setMythLensEnabled((enabled) => !enabled);
-            playChime(520);
-          }}
-        >
-          <Eye aria-hidden="true" size={14} strokeWidth={1.8} />
-          <span>Lens</span>
-        </button>
-        <button
-          className={styles.wonderButton}
-          type="button"
           aria-pressed={sameStarsMode}
           data-active={sameStarsMode}
           onClick={() => {
             setHasExplored(true);
-            setSameStarsMode((enabled) => !enabled);
+            setSameStarsMode((enabled) => {
+              if (enabled) {
+                setHeldSharedHips([]);
+              }
+              return !enabled;
+            });
             playChime(680);
           }}
         >
@@ -1631,6 +1588,7 @@ export function SkyAtlas() {
             setJourneyStepIndex(0);
             if (journeyActive) {
               setHeldSharedHips([]);
+              setSameStarsMode(false);
             }
             playChime(journeyActive ? 380 : 760);
           }}

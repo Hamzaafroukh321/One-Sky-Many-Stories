@@ -25,7 +25,48 @@ One Sky, Many Stories is planned as a static Next.js app deployed on Vercel. The
 
 ## Repository Status
 
-This repository currently contains the product and implementation specification. Application code should be added incrementally according to the phase plan in the spec.
+This repository now contains the initial interactive implementation: a static Next.js sky atlas with real HYG star data, three culture overlays, constellation stories, compare mode, and an About / Sources panel.
+
+## Getting Started
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Generate the static sky data:
+
+```bash
+npm run build:data
+```
+
+Run the development server:
+
+```bash
+npm run dev
+```
+
+Verify the app:
+
+```bash
+npm run typecheck
+npm run build
+npm audit --omit=dev
+```
+
+The production build is static and exports to `out/`.
+
+## Current Implementation
+
+- Full-bleed Canvas 2D sky renderer
+- 5,041 visible HYG stars with magnitude-scaled glow and subtle color temperature
+- Greek, Chinese, and Polynesian/Hawaiian culture overlays
+- Culture rail with accent transitions
+- Pan, zoom, reset view, ambient drift, and reduced-motion handling
+- Constellation story panel with source and license text
+- Compare mode with ghost overlay
+- About / Sources view with required attribution
 
 ## Data And Licenses
 

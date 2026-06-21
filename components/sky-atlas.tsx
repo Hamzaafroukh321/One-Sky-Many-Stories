@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CircleHelp, Pin, RotateCcw, X } from "lucide-react";
 import styles from "./sky-atlas.module.css";
 
 type StarTuple = [number, string, number, number, number, number];
@@ -520,6 +521,11 @@ export function SkyAtlas() {
     setActiveCultureId(cultureId);
   };
 
+  const resetView = () => {
+    viewRef.current = { ...defaultView };
+    setViewReadout(defaultView);
+  };
+
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
@@ -609,20 +615,32 @@ export function SkyAtlas() {
         </div>
         <div className={styles.actions}>
           <button
+            className={styles.iconButton}
+            type="button"
+            aria-label="Reset sky view"
+            title="Reset view"
+            onClick={resetView}
+          >
+            <RotateCcw aria-hidden="true" size={15} strokeWidth={1.8} />
+          </button>
+          <button
             className={styles.textButton}
             type="button"
             aria-pressed={Boolean(pinnedCultureId)}
+            title="Pin this culture for comparison"
             onClick={() => setPinnedCultureId(pinnedCultureId ? null : activeCultureId)}
           >
-            Compare
+            <Pin aria-hidden="true" size={14} strokeWidth={1.8} />
+            <span>Compare</span>
           </button>
           <button
             className={styles.iconButton}
             type="button"
             aria-label="Open sources"
+            title="Sources"
             onClick={() => setShowSources(true)}
           >
-            ?
+            <CircleHelp aria-hidden="true" size={16} strokeWidth={1.8} />
           </button>
         </div>
       </header>
@@ -649,7 +667,7 @@ export function SkyAtlas() {
               aria-label="Close story panel"
               onClick={() => setSelectedConstellationId(null)}
             >
-              x
+              <X aria-hidden="true" size={16} strokeWidth={1.8} />
             </button>
             <p className={styles.eyebrow}>Constellation &middot; {activeCulture.region}</p>
             <h2>{selectedConstellation.name}</h2>
@@ -681,7 +699,7 @@ export function SkyAtlas() {
             aria-label="Close sources"
             onClick={() => setShowSources(false)}
           >
-            x
+            <X aria-hidden="true" size={16} strokeWidth={1.8} />
           </button>
           <p className={styles.eyebrow}>About &middot; Sources</p>
           <h2>The stars don't move. The stories do.</h2>

@@ -12,6 +12,18 @@
   color-scheme: dark;
 }
 
+@property --accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e8d9a0;
+}
+
+@property --line {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c9b66e;
+}
+
 * {
   box-sizing: border-box;
 }

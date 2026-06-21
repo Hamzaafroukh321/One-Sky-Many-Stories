@@ -51,6 +51,20 @@ type ViewState = {
   zoom: number;
 };
 
+type HoverTarget = {
+  id: string;
+  name: string;
+  nativeName: string;
+  x: number;
+  y: number;
+};
+
+type CultureSwitchNotice = {
+  id: number;
+  from: string;
+  to: string;
+};
+
 const cultureIds = ["greek", "chinese", "polynesian"];
 const defaultView: ViewState = { ra: 6.5, dec: 10, zoom: 520 };
 
@@ -60,6 +74,16 @@ function clamp(value: number, min: number, max: number) {
 
 function wrapRa(ra: number) {
   return ((ra % 24) + 24) % 24;
+}
+
+function easeOutCubic(value: number) {
+  const t = clamp(value, 0, 1);
+  return 1 - (1 - t) ** 3;
+}
+
+function easeInOutCubic(value: number) {
+  const t = clamp(value, 0, 1);
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 }
 
 function hexToRgb(hex: string) {
@@ -228,20 +252,29 @@ function constellationCentroid(
   };
 }
 
+function constellationHipSet(constellation: Constellation) {
+  return new Set(constellation.lines.flatMap((line) => line));
+}
+
 export function SkyAtlas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewRef = useRef<ViewState>(defaultView);
   const dragRef = useRef<{ x: number; y: number; view: ViewState } | null>(null);
   const transitionRef = useRef<{ from: string; to: string; startedAt: number } | null>(null);
+  const ignitionStartedAtRef = useRef<number | null>(null);
   const [stars, setStars] = useState<Star[]>([]);
   const [cultures, setCultures] = useState<Culture[]>([]);
   const [activeCultureId, setActiveCultureId] = useState("greek");
   const [pinnedCultureId, setPinnedCultureId] = useState<string | null>(null);
   const [selectedConstellationId, setSelectedConstellationId] = useState<string | null>(null);
   const [hoveredConstellationId, setHoveredConstellationId] = useState<string | null>(null);
+  const [hoverTarget, setHoverTarget] = useState<HoverTarget | null>(null);
   const [showSources, setShowSources] = useState(false);
   const [viewReadout, setViewReadout] = useState(defaultView);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [skyReady, setSkyReady] = useState(false);
+  const [hasExplored, setHasExplored] = useState(false);
+  const [cultureSwitchNotice, setCultureSwitchNotice] = useState<CultureSwitchNotice | null>(null);
 
   const activeCulture = useMemo(
     () => cultures.find((culture) => culture.id === activeCultureId) ?? cultures[0],
@@ -259,6 +292,29 @@ export function SkyAtlas() {
     [activeCulture, selectedConstellationId],
   );
   const starsByHip = useMemo(() => new Map(stars.map((star) => [star.hip, star])), [stars]);
+  const overlapInsights = useMemo(() => {
+    if (!selectedConstellation || !activeCulture) {
+      return [];
+    }
+
+    const selectedStars = constellationHipSet(selectedConstellation);
+
+    return cultures
+      .filter((culture) => culture.id !== activeCulture.id)
+      .flatMap((culture) =>
+        culture.constellations.map((constellation) => {
+          const overlap = [...constellationHipSet(constellation)].filter((hip) => selectedStars.has(hip));
+          return {
+            culture: culture.label,
+            name: constellation.name,
+            count: overlap.length,
+          };
+        }),
+      )
+      .filter((item) => item.count >= 2)
+      .sort((first, second) => second.count - first.count)
+      .slice(0, 3);
+  }, [activeCulture, cultures, selectedConstellation]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -285,6 +341,7 @@ export function SkyAtlas() {
 
       setStars(starTuples.map(toStar));
       setCultures(culturePayloads);
+      setSkyReady(true);
     }
 
     loadData().catch((error) => {
@@ -305,9 +362,12 @@ export function SkyAtlas() {
 
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
-      let best: { id: string; distance: number } | null = null;
+      let best: { constellation: Constellation; distance: number; centroid: { x: number; y: number } | null } | null =
+        null;
 
       for (const constellation of culture.constellations) {
+        const centroid = constellationCentroid(constellation, starsByHip, viewRef.current, width, height);
+
         for (const line of constellation.lines) {
           const points = line
             .map((hip) => starsByHip.get(hip))
@@ -325,14 +385,24 @@ export function SkyAtlas() {
               points[index].y,
             );
 
-            if (distance < 14 && (!best || distance < best.distance)) {
-              best = { id: constellation.id, distance };
+            if (distance < 20 && (!best || distance < best.distance)) {
+              best = { constellation, distance, centroid };
             }
           }
         }
       }
 
-      return best?.id ?? null;
+      if (!best) {
+        return null;
+      }
+
+      return {
+        id: best.constellation.id,
+        name: best.constellation.name,
+        nativeName: best.constellation.nativeName,
+        x: best.centroid?.x ?? x,
+        y: best.centroid?.y ?? y,
+      };
     },
     [starsByHip],
   );
@@ -372,27 +442,64 @@ export function SkyAtlas() {
       context.save();
       context.lineCap = "round";
       context.lineJoin = "round";
+      context.setLineDash(options.ghost ? [7, 10] : []);
 
       for (const constellation of culture.constellations) {
         const hovered = constellation.id === hoveredConstellationId;
         const dimmed = hoveredConstellationId && !hovered && !options.ghost;
-        context.strokeStyle = rgba(lineColor, options.alpha * (dimmed ? 0.36 : hovered ? 1 : 0.74));
-        context.lineWidth = options.ghost ? 1 : hovered ? 2.4 : 1.35;
-
-        for (const line of constellation.lines) {
-          const points = line
+        const strokeAlpha = options.alpha * (dimmed ? 0.16 : hovered ? 1 : options.ghost ? 0.56 : 0.72);
+        const projectedLines = constellation.lines.map((line) =>
+          line
             .map((hip) => starsByHip.get(hip))
             .filter((star): star is Star => Boolean(star))
-            .map((star) => projectStar(star, viewRef.current, width, height));
+            .map((star) => projectStar(star, viewRef.current, width, height)),
+        );
+
+        if (hovered && !options.ghost) {
+          context.save();
+          context.setLineDash([]);
+          context.shadowColor = rgba(culture.accent, 0.92);
+          context.shadowBlur = 22;
+          context.strokeStyle = rgba(culture.accent, 0.28);
+          context.lineWidth = 8;
+          for (const points of projectedLines) {
+            drawProgressPath(context, points, options.progress);
+          }
+          context.restore();
+        }
+
+        context.strokeStyle = rgba(lineColor, strokeAlpha);
+        context.lineWidth = options.ghost ? 1.1 : hovered ? 3 : 1.35;
+
+        for (const points of projectedLines) {
           drawProgressPath(context, points, options.progress);
         }
 
         if (hovered && !options.ghost) {
-          const centroid = constellationCentroid(constellation, starsByHip, viewRef.current, width, height);
-          if (centroid) {
-            context.font = "12px var(--font-space-mono)";
-            context.fillStyle = rgba(culture.accent, 0.95);
-            context.fillText(constellation.name.toUpperCase(), centroid.x + 12, centroid.y - 12);
+          const highlightedHips = new Set(constellation.lines.flatMap((line) => line));
+          for (const hip of highlightedHips) {
+            const star = starsByHip.get(hip);
+            if (!star) {
+              continue;
+            }
+
+            const point = projectStar(star, viewRef.current, width, height);
+            if (!point.visible) {
+              continue;
+            }
+
+            const pulse = reducedMotion ? 1 : 0.78 + Math.sin(performance.now() * 0.004 + star.phase) * 0.22;
+            context.save();
+            context.strokeStyle = rgba(culture.accent, 0.48 * pulse);
+            context.lineWidth = 1;
+            context.beginPath();
+            context.arc(point.x, point.y, 7.5 + pulse * 2.5, 0, Math.PI * 2);
+            context.stroke();
+            context.fillStyle = rgba(culture.accent, 0.24);
+            context.beginPath();
+            context.arc(point.x, point.y, 2.4, 0, Math.PI * 2);
+            context.fill();
+            context.restore();
           }
         }
       }
@@ -401,6 +508,14 @@ export function SkyAtlas() {
     };
 
     const render = (time: number) => {
+      if (skyReady && ignitionStartedAtRef.current === null) {
+        ignitionStartedAtRef.current = time;
+      }
+
+      const ignitionElapsed = ignitionStartedAtRef.current === null ? 0 : time - ignitionStartedAtRef.current;
+      const skyIgnition = reducedMotion ? 1 : easeOutCubic(ignitionElapsed / 900);
+      const lineIgnition = reducedMotion ? 1 : easeOutCubic((ignitionElapsed - 620) / 780);
+
       context.clearRect(0, 0, width, height);
       context.fillStyle = "#05060A";
       context.fillRect(0, 0, width, height);
@@ -435,7 +550,11 @@ export function SkyAtlas() {
         const radius = Math.max(0.35, (6.5 - star.mag) * 0.45);
         const baseAlpha = Math.min(1, Math.max(0.25, (6.5 - star.mag) / 7));
         const twinkle = reducedMotion ? 1 : 0.92 + Math.sin(time * 0.001 + star.phase) * 0.08;
-        const alpha = baseAlpha * twinkle;
+        const distanceFromCenter = Math.hypot(point.x - width / 2, point.y - height / 2) / Math.max(width, height);
+        const starIgnition = reducedMotion
+          ? 1
+          : easeOutCubic((ignitionElapsed - distanceFromCenter * 420) / 900);
+        const alpha = baseAlpha * twinkle * skyIgnition * starIgnition;
 
         if (radius > 1.25) {
           const glow = context.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius * 5.2);
@@ -460,18 +579,20 @@ export function SkyAtlas() {
       if (activeCulture) {
         const transition = transitionRef.current;
         if (!transition || reducedMotion) {
-          drawCulture(activeCulture, { alpha: 1, progress: 1 });
+          drawCulture(activeCulture, { alpha: lineIgnition, progress: lineIgnition });
         } else {
           const elapsed = time - transition.startedAt;
           const outgoing = cultures.find((culture) => culture.id === transition.from);
           const incoming = cultures.find((culture) => culture.id === transition.to);
 
           if (outgoing && elapsed < 350) {
-            drawCulture(outgoing, { alpha: 1 - elapsed / 350, progress: 1 - elapsed / 350 });
+            const outgoingProgress = 1 - easeInOutCubic(elapsed / 350);
+            drawCulture(outgoing, { alpha: outgoingProgress, progress: outgoingProgress });
           }
 
           if (incoming && elapsed >= 430) {
-            drawCulture(incoming, { alpha: 1, progress: clamp((elapsed - 430) / 450, 0, 1) });
+            const incomingProgress = easeOutCubic((elapsed - 430) / 450);
+            drawCulture(incoming, { alpha: incomingProgress, progress: incomingProgress });
           }
 
           if (elapsed > 900) {
@@ -502,6 +623,7 @@ export function SkyAtlas() {
     hoveredConstellationId,
     pinnedCulture,
     reducedMotion,
+    skyReady,
     stars,
     starsByHip,
   ]);
@@ -511,13 +633,18 @@ export function SkyAtlas() {
       return;
     }
 
+    const from = activeCulture?.label ?? activeCultureId;
+    const to = cultures.find((culture) => culture.id === cultureId)?.label ?? cultureId;
     transitionRef.current = {
       from: activeCultureId,
       to: cultureId,
       startedAt: performance.now(),
     };
+    setHasExplored(true);
     setSelectedConstellationId(null);
     setHoveredConstellationId(null);
+    setHoverTarget(null);
+    setCultureSwitchNotice({ id: Date.now(), from, to });
     setActiveCultureId(cultureId);
   };
 
@@ -527,6 +654,7 @@ export function SkyAtlas() {
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    setHasExplored(true);
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
       x: event.clientX,
@@ -548,7 +676,9 @@ export function SkyAtlas() {
     }
 
     const rect = event.currentTarget.getBoundingClientRect();
-    setHoveredConstellationId(findConstellationAt(event.clientX - rect.left, event.clientY - rect.top, activeCulture));
+    const target = findConstellationAt(event.clientX - rect.left, event.clientY - rect.top, activeCulture);
+    setHoveredConstellationId(target?.id ?? null);
+    setHoverTarget(target);
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -562,13 +692,14 @@ export function SkyAtlas() {
     const moved = Math.hypot(event.clientX - drag.x, event.clientY - drag.y);
     if (moved < 4) {
       const rect = event.currentTarget.getBoundingClientRect();
-      const constellationId = findConstellationAt(event.clientX - rect.left, event.clientY - rect.top, activeCulture);
-      setSelectedConstellationId(constellationId);
+      const target = findConstellationAt(event.clientX - rect.left, event.clientY - rect.top, activeCulture);
+      setSelectedConstellationId(target?.id ?? null);
     }
   };
 
   const handleWheel = (event: React.WheelEvent<HTMLCanvasElement>) => {
     event.preventDefault();
+    setHasExplored(true);
     const direction = event.deltaY > 0 ? 0.9 : 1.1;
     viewRef.current = {
       ...viewRef.current,
@@ -588,9 +719,21 @@ export function SkyAtlas() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  useEffect(() => {
+    if (!cultureSwitchNotice) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setCultureSwitchNotice(null), 1180);
+    return () => window.clearTimeout(timeout);
+  }, [cultureSwitchNotice]);
+
   return (
     <main
       className={styles.shell}
+      data-ready={skyReady}
+      data-exploring={hasExplored || Boolean(selectedConstellation) || Boolean(pinnedCultureId)}
+      data-hover={Boolean(hoverTarget)}
       style={
         {
           "--accent": activeCulture?.accent ?? "#E8D9A0",
@@ -604,10 +747,16 @@ export function SkyAtlas() {
         aria-label="Interactive star map"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
-        onPointerLeave={() => setHoveredConstellationId(null)}
+        onPointerLeave={() => {
+          setHoveredConstellationId(null);
+          setHoverTarget(null);
+        }}
         onPointerUp={handlePointerUp}
         onWheel={handleWheel}
       />
+      <div className={styles.loadingVeil} aria-hidden="true">
+        <span>Aligning star catalog</span>
+      </div>
       <header className={styles.topBar}>
         <div className={styles.wordmark}>ONE SKY &middot; MANY STORIES</div>
         <div className={styles.readout} aria-live="polite">
@@ -628,7 +777,10 @@ export function SkyAtlas() {
             type="button"
             aria-pressed={Boolean(pinnedCultureId)}
             title="Pin this culture for comparison"
-            onClick={() => setPinnedCultureId(pinnedCultureId ? null : activeCultureId)}
+            onClick={() => {
+              setHasExplored(true);
+              setPinnedCultureId(pinnedCultureId ? null : activeCultureId);
+            }}
           >
             <Pin aria-hidden="true" size={14} strokeWidth={1.8} />
             <span>Compare</span>
@@ -651,10 +803,34 @@ export function SkyAtlas() {
         <span>The stars don't move. The stories do.</span>
       </section>
 
-      {pinnedCulture && activeCulture && pinnedCulture.id !== activeCulture.id ? (
+      {cultureSwitchNotice ? (
+        <div key={cultureSwitchNotice.id} className={styles.switchNotice} aria-live="polite">
+          <span>{cultureSwitchNotice.from}</span>
+          <strong>{cultureSwitchNotice.to}</strong>
+        </div>
+      ) : null}
+
+      {hoverTarget ? (
+        <div
+          className={styles.hoverCard}
+          style={
+            {
+              "--hover-x": `${hoverTarget.x}px`,
+              "--hover-y": `${hoverTarget.y}px`,
+            } as React.CSSProperties
+          }
+        >
+          <span>Figure under cursor</span>
+          <strong>{hoverTarget.name}</strong>
+          {hoverTarget.nativeName ? <em>{hoverTarget.nativeName}</em> : null}
+        </div>
+      ) : null}
+
+      {pinnedCulture && activeCulture ? (
         <div className={styles.compareLegend}>
-          <span>Ghost {pinnedCulture.label}</span>
-          <span>Active {activeCulture.label}</span>
+          <span data-kind="ghost">Pinned {pinnedCulture.label}</span>
+          <span data-kind="active">Active {activeCulture.label}</span>
+          {pinnedCulture.id === activeCulture.id ? <strong>Switch culture to compare</strong> : null}
         </div>
       ) : null}
 
@@ -678,6 +854,16 @@ export function SkyAtlas() {
             </p>
             <div className={styles.rule} />
             <p className={styles.myth}>{selectedConstellation.myth}</p>
+            {overlapInsights.length > 0 ? (
+              <div className={styles.overlapNote}>
+                <strong>Same stars also appear as</strong>
+                {overlapInsights.map((item) => (
+                  <span key={`${item.culture}-${item.name}`}>
+                    {item.name} in {item.culture} ({item.count} shared stars)
+                  </span>
+                ))}
+              </div>
+            ) : null}
             <footer className={styles.sourceBlock}>
               <strong>Source</strong>
               <span>{activeCulture.source}</span>

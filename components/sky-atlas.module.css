@@ -23,6 +23,49 @@
   cursor: grabbing;
 }
 
+.shell[data-hover="true"] .sky {
+  cursor: crosshair;
+}
+
+.loadingVeil {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #000;
+  color: var(--mute);
+  font-family: var(--font-space-mono), monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity 900ms ease;
+}
+
+.loadingVeil span {
+  position: relative;
+  padding-bottom: 14px;
+}
+
+.loadingVeil span::after {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 86px;
+  height: 1px;
+  background: var(--accent);
+  transform: translateX(-50%) scaleX(0);
+  transform-origin: left;
+  animation: loadLine 1100ms ease forwards;
+  content: "";
+}
+
+.shell[data-ready="true"] .loadingVeil {
+  opacity: 0;
+}
+
 .topBar {
   position: absolute;
   z-index: 2;
@@ -111,6 +154,10 @@
   transition: opacity 240ms ease;
 }
 
+.shell[data-exploring="true"] .intro {
+  opacity: 0.62;
+}
+
 .intro p,
 .intro span {
   margin: 0;
@@ -141,19 +188,24 @@
   content: "";
 }
 
-.compareLegend {
+.compareLegend,
+.switchNotice,
+.hoverCard {
   position: absolute;
   z-index: 2;
+  font-family: var(--font-space-mono), monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.compareLegend {
   left: clamp(24px, 6vw, 86px);
   bottom: calc(var(--rail-height) + 18px);
   display: flex;
   gap: 14px;
   padding: 9px 0;
   color: var(--mute);
-  font-family: var(--font-space-mono), monospace;
   font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .compareLegend span {
@@ -170,8 +222,99 @@
   content: "";
 }
 
-.compareLegend span:last-child {
+.compareLegend span[data-kind="ghost"]::before {
+  background: repeating-linear-gradient(
+    to right,
+    currentColor 0 5px,
+    transparent 5px 9px
+  );
+}
+
+.compareLegend span[data-kind="active"] {
   color: var(--accent);
+}
+
+.compareLegend strong {
+  color: var(--accent);
+  font-weight: 400;
+}
+
+.switchNotice {
+  top: 74px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  color: var(--mute);
+  font-size: 11px;
+  transform: translateX(-50%);
+  animation: switchNotice 1120ms ease both;
+  pointer-events: none;
+}
+
+.switchNotice::before,
+.switchNotice::after {
+  display: block;
+  width: 34px;
+  height: 1px;
+  background: var(--accent);
+  content: "";
+}
+
+.switchNotice strong {
+  color: var(--starlight);
+  font-weight: 400;
+}
+
+.hoverCard {
+  left: clamp(20px, var(--hover-x), calc(100vw - 230px));
+  top: clamp(74px, calc(var(--hover-y) - 76px), calc(100vh - var(--rail-height) - 126px));
+  width: 210px;
+  padding: 12px 13px;
+  border-left: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--ink) 84%, transparent);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+  animation: hoverCardIn 180ms ease-out both;
+}
+
+.hoverCard::before {
+  position: absolute;
+  left: -7px;
+  top: 17px;
+  width: 13px;
+  height: 1px;
+  background: var(--accent);
+  content: "";
+}
+
+.hoverCard span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--mute);
+  font-size: 10px;
+}
+
+.hoverCard strong {
+  display: block;
+  color: var(--starlight);
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: 24px;
+  font-variation-settings: "opsz" 144, "wght" 560;
+  font-weight: 560;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: none;
+}
+
+.hoverCard em {
+  display: block;
+  margin-top: 8px;
+  color: var(--accent);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.35;
 }
 
 .storyPanel,
@@ -272,6 +415,29 @@
 .emptyState {
   margin-top: 54px;
   color: var(--mute);
+}
+
+.overlapNote {
+  display: grid;
+  gap: 8px;
+  margin-top: 26px;
+  padding: 14px 0 0;
+  border-top: 1px solid color-mix(in srgb, var(--accent) 42%, transparent);
+  color: var(--mute);
+  font-family: var(--font-space-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.overlapNote strong {
+  color: var(--accent);
+  font-weight: 400;
+}
+
+.overlapNote span {
+  color: color-mix(in srgb, var(--starlight) 74%, var(--mute));
 }
 
 .sourceBlock {
@@ -390,6 +556,10 @@
     right: 20px;
   }
 
+  .shell[data-exploring="true"] .intro {
+    opacity: 0;
+  }
+
   .intro h1 {
     font-size: clamp(42px, 16vw, 62px);
   }
@@ -409,6 +579,21 @@
     right: 20px;
     bottom: 132px;
     flex-wrap: wrap;
+  }
+
+  .switchNotice {
+    top: 62px;
+    width: calc(100vw - 40px);
+    justify-content: center;
+  }
+
+  .switchNotice::before,
+  .switchNotice::after {
+    width: 20px;
+  }
+
+  .hoverCard {
+    display: none;
   }
 
   .storyPanel,
@@ -438,7 +623,50 @@
 
   .storyPanel,
   .sourcesPanel,
-  .intro {
+  .intro,
+  .loadingVeil {
     transition: none;
+  }
+
+  .loadingVeil span::after,
+  .switchNotice,
+  .hoverCard {
+    animation: none;
+  }
+}
+
+@keyframes loadLine {
+  to {
+    transform: translateX(-50%) scaleX(1);
+  }
+}
+
+@keyframes switchNotice {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+
+  18%,
+  72% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+}
+
+@keyframes hoverCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

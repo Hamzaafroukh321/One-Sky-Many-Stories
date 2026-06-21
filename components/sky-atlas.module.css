@@ -272,7 +272,7 @@
 }
 
 .hoverCard {
-  left: clamp(20px, calc(var(--hover-x) + 28px), calc(100vw - 270px));
+  left: clamp(20px, calc(var(--hover-x) + 76px), calc(100vw - 310px));
   top: clamp(74px, calc(var(--hover-y) - 96px), calc(100vh - var(--rail-height) - 150px));
   width: 210px;
   min-height: 92px;

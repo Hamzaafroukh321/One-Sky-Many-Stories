@@ -126,6 +126,15 @@ function starTint(ci: number, alpha: number) {
 function drawStar(context: CanvasRenderingContext2D, x: number, y: number, mag: number, ci: number, alpha = 1) {
   const brightness = clamp((6.5 - mag) / 8, 0, 1);
   const coreRadius = Math.max(0.45, brightness * 1.45);
+
+  if (mag >= 4.25) {
+    context.fillStyle = `rgba(237, 239, 247, ${0.28 * alpha + 0.28 * brightness * alpha})`;
+    context.beginPath();
+    context.arc(x, y, coreRadius, 0, Math.PI * 2);
+    context.fill();
+    return;
+  }
+
   const haloRadius = coreRadius * (3 + brightness * 4);
   const color = ciToRgb(ci);
   const halo = context.createRadialGradient(x, y, 0, x, y, haloRadius);
@@ -198,6 +207,39 @@ function projectStar(star: Star, view: ViewState, width: number, height: number)
     x: width / 2 + rx * k * view.zoom,
     y: height / 2 - ry * k * view.zoom,
     visible: true,
+  };
+}
+
+function createProjector(view: ViewState, width: number, height: number) {
+  const centerRa = view.ra * (Math.PI / 12);
+  const centerDec = view.dec * (Math.PI / 180);
+  const centerX = Math.cos(centerDec) * Math.cos(centerRa);
+  const centerY = Math.cos(centerDec) * Math.sin(centerRa);
+  const centerZ = Math.sin(centerDec);
+  const eastX = -Math.sin(centerRa);
+  const eastY = Math.cos(centerRa);
+  const northX = -Math.sin(centerDec) * Math.cos(centerRa);
+  const northY = -Math.sin(centerDec) * Math.sin(centerRa);
+  const northZ = Math.cos(centerDec);
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+  const zoom = view.zoom;
+
+  return (star: Star): ProjectedPoint => {
+    const rx = star.x * eastX + star.y * eastY;
+    const ry = star.x * northX + star.y * northY + star.z * northZ;
+    const rz = star.x * centerX + star.y * centerY + star.z * centerZ;
+
+    if (rz <= -0.999) {
+      return { x: 0, y: 0, visible: false };
+    }
+
+    const k = 1 / (1 + rz);
+    return {
+      x: halfWidth + rx * k * zoom,
+      y: halfHeight - ry * k * zoom,
+      visible: true,
+    };
   };
 }
 
@@ -531,7 +573,9 @@ export function SkyAtlas() {
     let animationFrame = 0;
     let width = 0;
     let height = 0;
+    let lastFrame = 0;
     let lastReadout = 0;
+    let projectCurrent = (star: Star) => projectStar(star, viewRef.current, width, height);
 
     const resize = () => {
       const pixelRatio = window.devicePixelRatio || 1;
@@ -562,7 +606,7 @@ export function SkyAtlas() {
           line
             .map((hip) => starsByHip.get(hip))
             .filter((star): star is Star => Boolean(star))
-            .map((star) => projectStar(star, viewRef.current, width, height)),
+            .map((star) => projectCurrent(star)),
         );
 
         if (hovered && !options.ghost) {
@@ -595,7 +639,7 @@ export function SkyAtlas() {
               continue;
             }
 
-            const point = projectStar(star, viewRef.current, width, height);
+            const point = projectCurrent(star);
             if (!point.visible) {
               continue;
             }
@@ -635,7 +679,7 @@ export function SkyAtlas() {
       }));
       const target = constellation.image.anchors.slice(0, 3).map((anchor) => {
         const star = starsByHip.get(anchor.hip);
-        return star ? projectStar(star, viewRef.current, width, height) : null;
+        return star ? projectCurrent(star) : null;
       });
 
       if (target.some((point) => !point?.visible)) {
@@ -687,7 +731,7 @@ export function SkyAtlas() {
       context.beginPath();
       context.ellipse(targetCenter.x, targetCenter.y, clipRadius * 1.05, clipRadius * 0.9, 0, 0, Math.PI * 2);
       context.clip();
-      context.globalAlpha = reducedMotion ? 0.07 : 0.058 + Math.sin(performance.now() * 0.002) * 0.008;
+      context.globalAlpha = reducedMotion ? 0.13 : 0.115 + Math.sin(performance.now() * 0.002) * 0.014;
       context.globalCompositeOperation = "screen";
       context.filter = `grayscale(1) contrast(1.58) brightness(1.24) sepia(0.22) drop-shadow(0 0 8px ${culture.line})`;
       context.translate(targetCenter.x, targetCenter.y);
@@ -720,7 +764,7 @@ export function SkyAtlas() {
           continue;
         }
 
-        const point = projectStar(star, viewRef.current, width, height);
+        const point = projectCurrent(star);
         if (!point.visible || point.x < -12 || point.x > width + 12 || point.y < -12 || point.y > height + 12) {
           continue;
         }
@@ -734,6 +778,12 @@ export function SkyAtlas() {
     };
 
     const render = (time: number) => {
+      if (time - lastFrame < 1000 / 45) {
+        animationFrame = requestAnimationFrame(render);
+        return;
+      }
+      lastFrame = time;
+
       if (skyReady && ignitionStartedAtRef.current === null) {
         ignitionStartedAtRef.current = time;
       }
@@ -767,10 +817,12 @@ export function SkyAtlas() {
         };
       }
 
+      projectCurrent = createProjector(viewRef.current, width, height);
+
       context.save();
       context.globalCompositeOperation = "lighter";
       for (const star of stars) {
-        const point = projectStar(star, viewRef.current, width, height);
+        const point = projectCurrent(star);
         if (!point.visible || point.x < -24 || point.x > width + 24 || point.y < -24 || point.y > height + 24) {
           continue;
         }
@@ -823,7 +875,7 @@ export function SkyAtlas() {
         }
       }
 
-      if (time - lastReadout > 160) {
+      if (time - lastReadout > 360) {
         lastReadout = time;
         setViewReadout(viewRef.current);
       }

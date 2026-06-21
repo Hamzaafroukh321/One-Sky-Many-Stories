@@ -71,7 +71,7 @@ type CultureSwitchNotice = {
 };
 
 const cultureIds = ["greek", "chinese", "polynesian"];
-const defaultView: ViewState = { ra: 6.5, dec: 10, zoom: 650 };
+const defaultView: ViewState = { ra: 12.77, dec: 7, zoom: 340 };
 const SWITCH_RETRACT_MS = 300;
 const SWITCH_GAP_MS = 70;
 const SWITCH_GROW_MS = 400;
@@ -188,6 +188,7 @@ function toStar(tuple: StarTuple, index: number): Star {
 function projectStar(star: Star, view: ViewState, width: number, height: number): ProjectedPoint {
   const centerRa = view.ra * (Math.PI / 12);
   const centerDec = view.dec * (Math.PI / 180);
+  const zoom = viewportZoom(view, width, height);
   const centerX = Math.cos(centerDec) * Math.cos(centerRa);
   const centerY = Math.cos(centerDec) * Math.sin(centerRa);
   const centerZ = Math.sin(centerDec);
@@ -206,8 +207,8 @@ function projectStar(star: Star, view: ViewState, width: number, height: number)
 
   const k = 1 / (1 + rz);
   return {
-    x: width / 2 + rx * k * view.zoom,
-    y: height / 2 - ry * k * view.zoom,
+    x: width / 2 + rx * k * zoom,
+    y: height / 2 - ry * k * zoom,
     visible: true,
   };
 }
@@ -225,7 +226,7 @@ function createProjector(view: ViewState, width: number, height: number) {
   const northZ = Math.cos(centerDec);
   const halfWidth = width / 2;
   const halfHeight = height / 2;
-  const zoom = view.zoom;
+  const zoom = viewportZoom(view, width, height);
 
   return (star: Star): ProjectedPoint => {
     const rx = star.x * eastX + star.y * eastY;
@@ -255,6 +256,11 @@ function formatRa(ra: number) {
 function formatDec(dec: number) {
   const sign = dec >= 0 ? "+" : "-";
   return `${sign}${Math.abs(Math.round(dec))}deg`;
+}
+
+function viewportZoom(view: ViewState, width: number, height: number) {
+  const scale = clamp(Math.min(width / 1440, height / 900), 0.55, 1.1);
+  return view.zoom * scale;
 }
 
 function distanceToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number) {
@@ -1042,10 +1048,12 @@ export function SkyAtlas() {
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (dragRef.current) {
       const drag = dragRef.current;
+      const rect = event.currentTarget.getBoundingClientRect();
+      const effectiveZoom = viewportZoom(drag.view, rect.width, rect.height);
       const next = {
         ...drag.view,
-        ra: wrapRa(drag.view.ra - ((event.clientX - drag.x) / drag.view.zoom) * 4.2),
-        dec: clamp(drag.view.dec + ((event.clientY - drag.y) / drag.view.zoom) * 52, -72, 72),
+        ra: wrapRa(drag.view.ra - ((event.clientX - drag.x) / effectiveZoom) * 4.2),
+        dec: clamp(drag.view.dec + ((event.clientY - drag.y) / effectiveZoom) * 52, -72, 72),
       };
       viewRef.current = next;
       return;

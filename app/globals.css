@@ -1,0 +1,46 @@
+:root {
+  --void: #05060a;
+  --ink: #0b0e16;
+  --haze: #161b2a;
+  --starlight: #edeff7;
+  --mute: #8a91a6;
+  --accent: #e8d9a0;
+  --line: #c9b66e;
+  --jade: #4fb286;
+  --panel-alpha: 0.92;
+  --rail-height: 92px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  background: var(--void);
+  color: var(--starlight);
+}
+
+body {
+  overflow: hidden;
+  font-family: var(--font-spectral), Georgia, serif;
+}
+
+button {
+  font: inherit;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: var(--starlight);
+}
